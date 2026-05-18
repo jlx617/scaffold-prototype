@@ -252,8 +252,11 @@
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              ${['基础设置','资产仓库','订单管理','设计管理','资产管理','结算管理','统计分析','系统配置'].map((m,i) => 
-                `<div class="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer" onclick='window.router.navigate("${['warehouse','map','rental-order','archive','outbound','internal-settlement','inventory-analysis','config'][i]}")'>`
+              ${[
+                {m:'基础设置',p:'warehouse'},{m:'资产仓库',p:'map'},{m:'订单管理',p:'rental-order'},{m:'设计管理',p:'archive'},
+                {m:'资产管理',p:'outbound'},{m:'结算管理',p:'internal-settlement'},{m:'统计分析',p:'inventory-analysis'},{m:'系统配置',p:'config'}
+              ].map(({m,p}) => 
+                `<div class="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer" onclick="window.router.navigate('${p}')">
                   <div class="inline-block px-3 py-1 rounded-full text-xs font-medium mb-2 bg-blue-100 text-blue-700">${m}</div>
                   <p class="text-sm text-slate-600">点击查看</p>
                 </div>`
