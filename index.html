@@ -7,484 +7,1332 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            border: 'hsl(var(--border))',
-            input: 'hsl(var(--input))',
-            ring: 'hsl(var(--ring))',
-            background: 'hsl(var(--background))',
-            foreground: 'hsl(var(--foreground))',
-            primary: {
-              DEFAULT: 'hsl(var(--primary))',
-              foreground: 'hsl(var(--primary-foreground))',
-            },
-            secondary: {
-              DEFAULT: 'hsl(var(--secondary))',
-              foreground: 'hsl(var(--secondary-foreground))',
-            },
-            muted: {
-              DEFAULT: 'hsl(var(--muted))',
-              foreground: 'hsl(var(--muted-foreground))',
-            },
-            accent: {
-              DEFAULT: 'hsl(var(--accent))',
-              foreground: 'hsl(var(--accent-foreground))',
-            },
-            destructive: {
-              DEFAULT: 'hsl(var(--destructive))',
-              foreground: 'hsl(var(--destructive-foreground))',
-            },
-            card: {
-              DEFAULT: 'hsl(var(--card))',
-              foreground: 'hsl(var(--card-foreground))',
-            },
-          },
-        },
-      },
+            primary: { DEFAULT: '#2563eb', hover: '#1d4ed8', light: '#dbeafe' },
+            sidebar: { bg: '#1e293b', text: '#cbd5e1', active: '#334155', hover: '#334155' },
+          }
+        }
+      }
     }
   </script>
   <style>
-    :root {
-      --background: 0 0% 100%;
-      --foreground: 222.2 84% 4.9%;
-      --card: 0 0% 100%;
-      --card-foreground: 222.2 84% 4.9%;
-      --popover: 0 0% 100%;
-      --popover-foreground: 222.2 84% 4.9%;
-      --primary: 221.2 83.2% 53.3%;
-      --primary-foreground: 210 40% 98%;
-      --secondary: 210 40% 96.1%;
-      --secondary-foreground: 222.2 47.4% 11.2%;
-      --muted: 210 40% 96.1%;
-      --muted-foreground: 215.4 16.3% 46.9%;
-      --accent: 210 40% 96.1%;
-      --accent-foreground: 222.2 47.4% 11.2%;
-      --destructive: 0 84.2% 60.2%;
-      --destructive-foreground: 210 40% 98%;
-      --border: 214.3 31.8% 91.4%;
-      --input: 214.3 31.8% 91.4%;
-      --ring: 221.2 83.2% 53.3%;
-      --radius: 0.5rem;
-    }
-    * {
-      border-color: hsl(var(--border));
-    }
-    .dialog-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 50;
-    }
-    .dialog-content {
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      z-index: 51;
-      max-width: 500px;
-      width: 90%;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    [hidden] { display: none !important; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; }
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+    .fade-in { animation: fadeIn 0.2s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .dialog-overlay { background: rgba(0,0,0,0.5); }
+    .menu-arrow { transition: transform 0.2s; display: inline-block; width: 16px; text-align: center; }
+    .menu-arrow.open { transform: rotate(90deg); }
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
-  <div id="app"></div>
-  <script>
-    // 状态管理
-    const store = {
-      systemConfig: JSON.parse(localStorage.getItem('systemConfig') || '{}'),
-      globalRules: JSON.parse(localStorage.getItem('globalRules') || '{}'),
-      versions: JSON.parse(localStorage.getItem('versions') || '[{"name":"v1.0.0","description":"初始版本","current":true}]'),
-      menus: JSON.parse(localStorage.getItem('menus') || '[]'),
-      
-      save(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-        this[key] = value;
-      }
-    };
+<body class="bg-gray-50 text-gray-800">
 
-    // 初始化默认数据
-    if (!store.systemConfig.name) {
-      store.save('systemConfig', {
-        name: '模架工装智能管理系统',
-        theme: 'light',
-        layout: 'sidebar',
-        enableNotification: true,
-        enableAuditLog: true,
-        sessionTimeout: 30
-      });
+<div id="app"></div>
+
+<script>
+// ==================== 全局状态 ====================
+window.store = {
+  currentHash: '',
+  menuExpanded: { 'basic': true, 'asset-warehouse': false, 'order': false, 'design': false, 'asset': false, 'settlement': false, 'stats': false },
+  dialogs: {}
+};
+
+// ==================== 路由 ====================
+window.router = {
+  routes: {
+    'home': 'home',
+    'warehouse': 'warehouse',
+    'product-category': 'productCategory',
+    'product-management': 'productManagement',
+    'bom': 'bom',
+    'amortization': 'amortization',
+    'rental': 'rental',
+    'map': 'map',
+    'management': 'management',
+    'rental-order': 'rentalOrder',
+    'transfer-order': 'transferOrder',
+    'purchase-order': 'purchaseOrder',
+    'archive': 'archive',
+    'outbound': 'outbound',
+    'inbound': 'inbound',
+    'inventory-check': 'inventoryCheck',
+    'maintenance': 'maintenance',
+    'disposal': 'disposal',
+    'refurbishment': 'refurbishment',
+    'internal-settlement': 'internalSettlement',
+    'external-settlement': 'externalSettlement',
+    'inventory-analysis': 'inventoryAnalysis',
+    'other-analysis': 'otherAnalysis',
+    'config': 'config',
+    'config/system': 'configSystem',
+    'config/version': 'configVersion',
+    'config/menu': 'configMenu',
+    'config/page': 'configPage',
+    'config/role': 'configRole'
+  },
+  navigate: function(hash) {
+    window.location.hash = hash;
+  },
+  getCurrentPage: function() {
+    var h = window.location.hash.replace('#', '') || 'home';
+    return this.routes[h] || 'home';
+  }
+};
+
+// ==================== 组件 ====================
+window.Components = {};
+
+window.Components.Button = function(opts) {
+  var cls = 'inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ';
+  if (opts.variant === 'primary') cls += 'bg-primary text-white hover:bg-primary-hover';
+  else if (opts.variant === 'outline') cls += 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50';
+  else if (opts.variant === 'danger') cls += 'bg-red-500 text-white hover:bg-red-600';
+  else if (opts.variant === 'ghost') cls += 'text-gray-600 hover:bg-gray-100';
+  else cls += 'bg-primary text-white hover:bg-primary-hover';
+  if (opts.size === 'sm') cls += ' px-3 py-1 text-xs';
+  if (opts.className) cls += ' ' + opts.className;
+  var onclick = opts.onclick ? ' onclick="' + opts.onclick + '"' : '';
+  return '<button class="' + cls + '"' + onclick + '>' + (opts.icon || '') + ' ' + opts.text + '</button>';
+};
+
+window.Components.Card = function(opts) {
+  var cls = 'bg-white rounded-lg shadow-sm border border-gray-200 p-6';
+  if (opts.className) cls += ' ' + opts.className;
+  return '<div class="' + cls + '">' + opts.content + '</div>';
+};
+
+window.Components.StatCard = function(opts) {
+  var colors = ['blue', 'green', 'orange', 'purple', 'red', 'teal', 'indigo', 'pink'];
+  var c = colors[opts.colorIndex % colors.length];
+  var bgMap = { blue: 'bg-blue-50', green: 'bg-green-50', orange: 'bg-orange-50', purple: 'bg-purple-50', red: 'bg-red-50', teal: 'bg-teal-50', indigo: 'bg-indigo-50', pink: 'bg-pink-50' };
+  var iconBgMap = { blue: 'bg-blue-100 text-blue-600', green: 'bg-green-100 text-green-600', orange: 'bg-orange-100 text-orange-600', purple: 'bg-purple-100 text-purple-600', red: 'bg-red-100 text-red-600', teal: 'bg-teal-100 text-teal-600', indigo: 'bg-indigo-100 text-indigo-600', pink: 'bg-pink-100 text-pink-600' };
+  return '<div class="' + (bgMap[c] || 'bg-blue-50') + ' rounded-lg p-6 border border-gray-100">' +
+    '<div class="flex items-center justify-between">' +
+      '<div><p class="text-sm text-gray-500">' + opts.label + '</p><p class="text-2xl font-bold text-gray-800 mt-1">' + opts.value + '</p></div>' +
+      '<div class="w-12 h-12 rounded-full ' + (iconBgMap[c] || '') + ' flex items-center justify-center text-xl">' + opts.icon + '</div>' +
+    '</div>' +
+    (opts.trend ? '<p class="text-xs text-gray-400 mt-2">' + opts.trend + '</p>' : '') +
+  '</div>';
+};
+
+window.Components.Table = function(opts) {
+  var html = '<div class="overflow-x-auto"><table class="w-full text-sm">';
+  html += '<thead><tr class="bg-gray-50 border-b border-gray-200">';
+  for (var i = 0; i < opts.columns.length; i++) {
+    html += '<th class="px-4 py-3 text-left font-medium text-gray-600">' + opts.columns[i] + '</th>';
+  }
+  html += '<th class="px-4 py-3 text-center font-medium text-gray-600">操作</th>';
+  html += '</tr></thead><tbody>';
+  for (var r = 0; r < opts.rows.length; r++) {
+    html += '<tr class="border-b border-gray-100 hover:bg-gray-50">';
+    for (var c = 0; c < opts.rows[r].length; c++) {
+      html += '<td class="px-4 py-3">' + opts.rows[r][c] + '</td>';
     }
+    html += '<td class="px-4 py-3 text-center"><button class="text-primary hover:underline text-xs" onclick="window.showDialog(\'' + (opts.dialogId || 'default') + '\')">编辑</button> <button class="text-red-500 hover:underline text-xs">删除</button></td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+};
 
-    // 路由管理
-    const router = {
-      current: window.location.hash.slice(1) || 'home',
-      navigate(path) {
-        window.location.hash = path;
-        this.current = path;
-        render();
-      }
-    };
-    window.router = router;
+window.Components.Input = function(opts) {
+  return '<input type="' + (opts.type || 'text') + '" placeholder="' + (opts.placeholder || '') + '" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ' + (opts.className || '') + '" />';
+};
 
-    // 组件
-    const Components = {
-      Button({ children, onClick, variant = 'primary', className = '' }) {
-        const variants = {
-          primary: 'bg-blue-600 text-white hover:bg-blue-700',
-          secondary: 'bg-slate-200 text-slate-900 hover:bg-slate-300',
-          outline: 'border border-slate-300 bg-white hover:bg-slate-50',
-          ghost: 'hover:bg-slate-100'
-        };
-        return `<button onclick='${onClick}' class="px-4 py-2 rounded-lg font-medium transition-colors ${variants[variant]} ${className}">${children}</button>`;
-      },
-      
-      Card({ title, children, className = '' }) {
-        return `<div class="bg-white rounded-xl border border-slate-200 shadow-sm ${className}">
-          ${title ? `<div class="px-6 py-4 border-b border-slate-100"><h3 class="font-semibold text-lg">${title}</h3></div>` : ''}
-          <div class="p-6">${children}</div>
-        </div>`;
-      },
+window.Components.Select = function(opts) {
+  var html = '<select class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary ' + (opts.className || '') + '">';
+  for (var i = 0; i < opts.options.length; i++) {
+    html += '<option>' + opts.options[i] + '</option>';
+  }
+  html += '</select>';
+  return html;
+};
 
-      Input({ label, value = '', onChange, placeholder = '', type = 'text' }) {
-        return `<div class="space-y-2">
-          ${label ? `<label class="text-sm font-medium">${label}</label>` : ''}
-          <input type="${type}" value="${value}" onchange="${onChange}" placeholder="${placeholder}" 
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>`;
-      },
+window.Components.Dialog = function(opts) {
+  return '<div id="dialog-' + opts.id + '" class="hidden fixed inset-0 z-50 flex items-center justify-center dialog-overlay">' +
+    '<div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 fade-in">' +
+      '<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">' +
+        '<h3 class="text-lg font-semibold">' + opts.title + '</h3>' +
+        '<button onclick="window.hideDialog(\'' + opts.id + '\')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>' +
+      '</div>' +
+      '<div class="px-6 py-4">' + opts.content + '</div>' +
+      '<div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">' +
+        '<button onclick="window.hideDialog(\'' + opts.id + '\')" class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">取消</button>' +
+        '<button onclick="window.hideDialog(\'' + opts.id + '\')" class="px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary-hover">确认</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+};
 
-      Select({ label, value, options, onChange }) {
-        const opts = options.map(o => `<option value="${o.value}" ${o.value === value ? 'selected' : ''}>${o.label}</option>`).join('');
-        return `<div class="space-y-2">
-          ${label ? `<label class="text-sm font-medium">${label}</label>` : ''}
-          <select onchange="${onChange}" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            ${opts}
-          </select>
-        </div>`;
-      },
+window.Components.Badge = function(opts) {
+  var cls = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ';
+  if (opts.color === 'green') cls += 'bg-green-100 text-green-700';
+  else if (opts.color === 'red') cls += 'bg-red-100 text-red-700';
+  else if (opts.color === 'yellow') cls += 'bg-yellow-100 text-yellow-700';
+  else if (opts.color === 'blue') cls += 'bg-blue-100 text-blue-700';
+  else if (opts.color === 'gray') cls += 'bg-gray-100 text-gray-700';
+  else cls += 'bg-blue-100 text-blue-700';
+  return '<span class="' + cls + '">' + opts.text + '</span>';
+};
 
-      Switch({ label, checked, onChange }) {
-        return `<div class="flex items-center justify-between">
-          <span class="text-sm font-medium">${label}</span>
-          <button onclick="${onChange}" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-200'}">
-            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}"></span>
-          </button>
-        </div>`;
-      },
+window.Components.Switch = function(opts) {
+  var checked = opts.checked ? 'checked' : '';
+  return '<label class="relative inline-flex items-center cursor-pointer">' +
+    '<input type="checkbox" class="sr-only peer" ' + checked + ' />' +
+    '<div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>' +
+  '</label>';
+};
 
-      Badge({ children, variant = 'default' }) {
-        const variants = {
-          default: 'bg-slate-100 text-slate-800',
-          success: 'bg-green-100 text-green-800',
-          warning: 'bg-yellow-100 text-yellow-800',
-          danger: 'bg-red-100 text-red-800'
-        };
-        return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[variant]}">${children}</span>`;
-      },
+// ==================== 弹窗控制 ====================
+window.showDialog = function(id) {
+  var el = document.getElementById('dialog-' + id);
+  if (el) el.classList.remove('hidden');
+};
+window.hideDialog = function(id) {
+  var el = document.getElementById('dialog-' + id);
+  if (el) el.classList.add('hidden');
+};
 
-      Table({ headers, rows }) {
-        const headerCells = headers.map(h => `<th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">${h}</th>`).join('');
-        const bodyRows = rows.map(row => `<tr class="border-b border-slate-100 hover:bg-slate-50">${row.map(cell => `<td class="px-4 py-3 text-sm">${cell}</td>`).join('')}</tr>`).join('');
-        return `<div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="bg-slate-50"><tr>${headerCells}</tr></thead>
-            <tbody>${bodyRows}</tbody>
-          </table>
-        </div>`;
-      },
+// ==================== 菜单折叠 ====================
+window.toggleMenu = function(group) {
+  window.store.menuExpanded[group] = !window.store.menuExpanded[group];
+  window.render();
+};
 
-      Dialog({ id, title, children, onClose }) {
-        return `<div id="${id}" class="dialog-overlay" onclick="if(event.target===this){${onClose}}" hidden>
-          <div class="dialog-content" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold">${title}</h2>
-              <button onclick="${onClose}" class="text-slate-400 hover:text-slate-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
-            ${children}
-          </div>
-        </div>`;
-      }
-    };
+// ==================== 页面辅助函数 ====================
+function pageWrapper(title, breadcrumbs, statsHtml, filterHtml, tableHtml, dialogId, dialogTitle, dialogFields) {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">' + title + '</h1>';
+  html += '<p class="text-sm text-gray-500 mt-1">' + breadcrumbs + '</p></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">' + statsHtml + '</div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<div class="flex flex-wrap items-center justify-between gap-4 mb-4">';
+  html += '<div class="flex flex-wrap items-center gap-3">' + filterHtml + '</div>';
+  html += '<div class="flex items-center gap-2">';
+  html += window.Components.Button({ text: '新增', variant: 'primary', icon: '+', onclick: "window.showDialog('" + dialogId + "')" });
+  html += window.Components.Button({ text: '导出', variant: 'outline', icon: '&#x2193;' });
+  html += '</div></div>';
+  html += tableHtml;
+  html += '</div></div>';
+  return html;
+}
 
-    // 页面组件
-    const Pages = {
-      home() {
-        return `<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-          <header class="bg-white border-b border-slate-200">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
-                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                </div>
-                <div>
-                  <h1 class="text-xl font-bold text-slate-900">模架工装智能管理系统</h1>
-                  <p class="text-xs text-slate-500">高保真原型平台</p>
-                </div>
-              </div>
-            </div>
-          </header>
+function formField(label, type) {
+  if (type === 'select') {
+    return '<div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">' + label + '</label>' +
+      '<select class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"><option>请选择</option></select></div>';
+  }
+  if (type === 'textarea') {
+    return '<div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">' + label + '</label>' +
+      '<textarea class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" rows="3"></textarea></div>';
+  }
+  return '<div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">' + label + '</label>' +
+    '<input type="text" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入' + label + '" /></div>';
+}
 
-          <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div class="text-center mb-16">
-              <h2 class="text-4xl font-bold text-slate-900 mb-4">模架工装智能管理系统</h2>
-              <p class="text-lg text-slate-600 max-w-2xl mx-auto mb-8">
-                基于需求调研资料构建的高保真原型平台，支持版本管理、页面配置、菜单调整等功能
-              </p>
-              <div class="flex justify-center gap-4">
-                ${Components.Button({ children: '进入原型', onClick: 'window.router.navigate("warehouse")', className: 'px-8' })}
-                ${Components.Button({ children: '配置中心', onClick: 'window.router.navigate("config")', variant: 'outline', className: 'px-8' })}
-              </div>
-            </div>
+// ==================== 页面定义 ====================
+window.Pages = {};
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
-              ${[{l:'一级模块',v:7},{l:'页面数量',v:22},{l:'功能点',v:50},{l:'配置项',v:200}].map(s => 
-                Components.Card({ children: `<div class="text-center"><div class="text-3xl font-bold text-slate-900 mb-1">${s.v}</div><div class="text-sm text-slate-500">${s.l}</div></div>` })
-              ).join('')}
-            </div>
+// ---------- 首页 ----------
+window.Pages.home = function() {
+  var modules = [
+    { name: '仓库设置', hash: 'warehouse', icon: '&#x1F3ED;', color: 'bg-blue-500' },
+    { name: '产品管理', hash: 'product-management', icon: '&#x1F4E6;', color: 'bg-green-500' },
+    { name: '租赁订单', hash: 'rental-order', icon: '&#x1F4CB;', color: 'bg-orange-500' },
+    { name: '资产地图', hash: 'map', icon: '&#x1F5FA;', color: 'bg-purple-500' },
+    { name: '出库管理', hash: 'outbound', icon: '&#x1F69A;', color: 'bg-red-500' },
+    { name: '入库管理', hash: 'inbound', icon: '&#x1F4E5;', color: 'bg-teal-500' },
+    { name: '内部结算', hash: 'internal-settlement', icon: '&#x1F4B0;', color: 'bg-indigo-500' },
+    { name: '库存分析', hash: 'inventory-analysis', icon: '&#x1F4CA;', color: 'bg-pink-500' }
+  ];
+  var html = '<div class="fade-in max-w-6xl mx-auto">';
+  html += '<div class="text-center py-16">';
+  html += '<h1 class="text-4xl font-bold text-gray-800 mb-4">模架工装智能管理系统</h1>';
+  html += '<p class="text-lg text-gray-500 mb-8 max-w-2xl mx-auto">集仓库管理、资产调度、订单跟踪、结算分析于一体的综合管理平台，助力模架工装业务数字化转型</p>';
+  html += '<div class="flex items-center justify-center gap-4">';
+  html += window.Components.Button({ text: '进入原型', variant: 'primary', onclick: "window.router.navigate('warehouse')" });
+  html += window.Components.Button({ text: '配置中心', variant: 'outline', onclick: "window.router.navigate('config')" });
+  html += '</div></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">';
+  html += window.Components.StatCard({ label: '仓库总数', value: '28', icon: '&#x1F3ED;', colorIndex: 0, trend: '覆盖全国 12 个城市' });
+  html += window.Components.StatCard({ label: '产品总数', value: '1,560', icon: '&#x1F4E6;', colorIndex: 1, trend: '本月新增 45 件' });
+  html += window.Components.StatCard({ label: '活跃订单', value: '89', icon: '&#x1F4CB;', colorIndex: 2, trend: '进行中 62 笔' });
+  html += window.Components.StatCard({ label: '资产总额', value: '¥2.8亿', icon: '&#x1F4B0;', colorIndex: 3, trend: '同比增长 12.5%' });
+  html += '</div>';
+  html += '<h2 class="text-xl font-bold text-gray-800 mb-4">功能模块</h2>';
+  html += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">';
+  for (var i = 0; i < modules.length; i++) {
+    var m = modules[i];
+    html += '<div onclick="window.router.navigate(\'' + m.hash + '\')" class="cursor-pointer bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow text-center">' +
+      '<div class="w-12 h-12 ' + m.color + ' rounded-lg flex items-center justify-center text-white text-2xl mx-auto mb-3">' + m.icon + '</div>' +
+      '<p class="font-medium text-gray-800">' + m.name + '</p></div>';
+  }
+  html += '</div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-bold text-gray-800 mb-4">最近动态</h2>';
+  html += '<div class="space-y-3">';
+  var activities = [
+    { time: '10:30', text: '华东分公司完成 Q1 盘点，盘盈 12 件' },
+    { time: '09:15', text: '租赁订单 LZ-2026-0384 已审批通过' },
+    { time: '昨天', text: '华南仓库入库铝合金模板 200 件' },
+    { time: '昨天', text: '维保工单 WB-2026-0156 已完成' },
+    { time: '2天前', text: '调拨订单 DB-2026-0092 已签收确认' }
+  ];
+  for (var j = 0; j < activities.length; j++) {
+    html += '<div class="flex items-start gap-3 py-2 border-b border-gray-50"><span class="text-xs text-gray-400 whitespace-nowrap mt-0.5">' + activities[j].time + '</span><span class="text-sm text-gray-600">' + activities[j].text + '</span></div>';
+  }
+  html += '</div></div></div>';
+  return html;
+};
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              ${[
-                {m:'基础设置',p:'warehouse'},{m:'资产仓库',p:'map'},{m:'订单管理',p:'rental-order'},{m:'设计管理',p:'archive'},
-                {m:'资产管理',p:'outbound'},{m:'结算管理',p:'internal-settlement'},{m:'统计分析',p:'inventory-analysis'},{m:'系统配置',p:'config'}
-              ].map(({m,p}) => 
-                `<div class="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer" onclick="window.router.navigate('${p}')">
-                  <div class="inline-block px-3 py-1 rounded-full text-xs font-medium mb-2 bg-blue-100 text-blue-700">${m}</div>
-                  <p class="text-sm text-slate-600">点击查看</p>
-                </div>`
-              ).join('')}
-            </div>
-          </main>
-        </div>`;
-      },
+// ---------- 仓库设置 ----------
+window.Pages.warehouse = function() {
+  var stats = window.Components.StatCard({ label: '仓库总数', value: '28', icon: '&#x1F3ED;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '启用仓库', value: '24', icon: '&#x2705;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '停用仓库', value: '4', icon: '&#x274C;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '总仓储面积', value: '86,000m²', icon: '&#x1F4CF;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索仓库名称/编码' }) +
+    window.Components.Select({ options: ['全部类型', '中心仓', '项目仓', '中转仓'] }) +
+    window.Components.Select({ options: ['全部状态', '启用', '停用'] });
+  var table = window.Components.Table({
+    columns: ['仓库编码', '仓库名称', '类型', '分公司', '负责人', '电话', '状态'],
+    rows: [
+      ['WH-001', '华东中心仓', '中心仓', '华东分公司', '张伟', '138****1234', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['WH-002', '华南中心仓', '中心仓', '华南分公司', '李明', '139****5678', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['WH-003', '华北项目仓', '项目仓', '华北分公司', '王强', '137****9012', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['WH-004', '西南中转仓', '中转仓', '西南分公司', '赵敏', '136****3456', window.Components.Badge({ text: '停用', color: 'red' })],
+      ['WH-005', '华中中心仓', '中心仓', '华中分公司', '陈刚', '135****7890', window.Components.Badge({ text: '启用', color: 'green' })]
+    ],
+    dialogId: 'dlg-warehouse'
+  });
+  var html = pageWrapper('仓库设置', '基础设置 / 仓库设置', stats, filter, table, 'dlg-warehouse', '新增仓库',
+    formField('仓库编码') + formField('仓库名称') + formField('仓库类型', 'select') + formField('所属分公司', 'select') +
+    formField('负责人') + formField('联系电话') + formField('仓库地址') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-warehouse', title: '新增仓库', content:
+    formField('仓库编码') + formField('仓库名称') + formField('仓库类型', 'select') + formField('所属分公司', 'select') +
+    formField('负责人') + formField('联系电话') + formField('仓库地址') + formField('备注', 'textarea') });
+  return html;
+};
 
-      warehouse() {
-        const warehouses = [
-          {code:'WH-001',name:'华东中心仓库',type:'中心仓库',company:'华东分公司',manager:'张伟',phone:'13800138001',status:'启用'},
-          {code:'WH-002',name:'华南中心仓库',type:'中心仓库',company:'华南分公司',manager:'李娜',phone:'13800138002',status:'启用'},
-          {code:'WH-003',name:'华北中心仓库',type:'中心仓库',company:'华北分公司',manager:'王强',phone:'13800138003',status:'启用'},
-          {code:'PJ-001',name:'上海浦东项目仓库',type:'项目仓库',company:'华东分公司',manager:'刘洋',phone:'13800138004',status:'启用'},
-          {code:'PJ-002',name:'深圳南山项目仓库',type:'项目仓库',company:'华南分公司',manager:'陈明',phone:'13800138005',status:'启用'},
-          {code:'PJ-003',name:'北京朝阳项目仓库',type:'项目仓库',company:'华北分公司',manager:'赵磊',phone:'13800138006',status:'停用'},
-          {code:'ST-001',name:'杭州物料站',type:'物料站',company:'华东分公司',manager:'孙涛',phone:'13800138007',status:'启用'},
-          {code:'ST-002',name:'武汉物料站',type:'物料站',company:'华南分公司',manager:'周杰',phone:'13800138008',status:'启用'},
-        ];
-        
-        return `<div class="min-h-screen bg-slate-50 flex">
-          ${Pages.sidebar()}
-          <div class="flex-1 flex flex-col">
-            ${Pages.header('仓库设置')}
-            <main class="flex-1 p-6 overflow-auto">
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.length}</div><p class="text-sm text-slate-500">仓库总数</p>` })}
-                ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.filter(w=>w.type==='中心仓库').length}</div><p class="text-sm text-slate-500">中心仓库</p>` })}
-                ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.filter(w=>w.type==='项目仓库').length}</div><p class="text-sm text-slate-500">项目仓库</p>` })}
-                ${Components.Card({ children: `<div class="text-2xl font-bold text-green-600">${warehouses.filter(w=>w.status==='启用').length}</div><p class="text-sm text-slate-500">启用中</p>` })}
-              </div>
-              
-              ${Components.Card({ title: '仓库列表', children: `
-                <div class="flex items-center gap-4 mb-4">
-                  <input type="text" placeholder="搜索仓库编码或名称..." class="flex-1 max-w-sm px-3 py-2 border border-slate-300 rounded-lg">
-                  <select class="px-3 py-2 border border-slate-300 rounded-lg"><option>全部类型</option><option>中心仓库</option><option>项目仓库</option><option>物料站</option></select>
-                  <select class="px-3 py-2 border border-slate-300 rounded-lg"><option>全部状态</option><option>启用</option><option>停用</option></select>
-                  ${Components.Button({ children: '新增仓库', onClick: 'showDialog("add-warehouse")' })}
-                  ${Components.Button({ children: '导出', variant: 'outline' })}
-                </div>
-                ${Components.Table({
-                  headers: ['编码','名称','类型','所属分公司','负责人','联系电话','状态','操作'],
-                  rows: warehouses.map(w => [
-                    w.code, w.name, w.type, w.company, w.manager, w.phone,
-                    Components.Badge({ children: w.status, variant: w.status === '启用' ? 'success' : 'default' }),
-                    `<div class="flex gap-2"><button class="text-blue-600 hover:text-blue-800">查看</button><button class="text-blue-600 hover:text-blue-800">编辑</button><button class="text-red-600 hover:text-red-800">删除</button></div>`
-                  ])
-                })}
-              ` })}
-            </main>
-          </div>
-          ${Components.Dialog({ id: 'add-warehouse', title: '新增仓库', onClose: 'hideDialog("add-warehouse")', children: `
-            <div class="space-y-4">
-              ${Components.Input({ label: '仓库编码', placeholder: '例如: CK001' })}
-              ${Components.Input({ label: '仓库名称', placeholder: '例如: 武汉物料站' })}
-              ${Components.Select({ label: '仓库类型', options: [{value:'',label:'请选择'},{value:'center',label:'中心仓库'},{value:'project',label:'项目仓库'},{value:'station',label:'物料站'}] })}
-              ${Components.Select({ label: '所属分公司', options: [{value:'',label:'请选择'},{value:'east',label:'华东分公司'},{value:'south',label:'华南分公司'},{value:'north',label:'华北分公司'}] })}
-              ${Components.Input({ label: '负责人', placeholder: '负责人姓名' })}
-              ${Components.Input({ label: '联系电话', placeholder: '联系电话' })}
-              ${Components.Input({ label: '地址', placeholder: '仓库地址' })}
-              <div class="flex justify-end gap-2 pt-4">
-                ${Components.Button({ children: '取消', variant: 'outline', onClick: 'hideDialog("add-warehouse")' })}
-                ${Components.Button({ children: '确认新增', onClick: 'hideDialog("add-warehouse")' })}
-              </div>
-            </div>
-          ` })}
-        </div>`;
-      },
+// ---------- 产品分类 ----------
+window.Pages.productCategory = function() {
+  var stats = window.Components.StatCard({ label: '分类总数', value: '36', icon: '&#x1F4C2;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '一级分类', value: '8', icon: '&#x1F4C1;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '二级分类', value: '18', icon: '&#x1F4C1;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '三级分类', value: '10', icon: '&#x1F4C1;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索分类名称/编码' }) +
+    window.Components.Select({ options: ['全部层级', '一级分类', '二级分类', '三级分类'] });
+  var table = window.Components.Table({
+    columns: ['分类编码', '分类名称', '上级分类', '产品数量', '排序', '状态'],
+    rows: [
+      ['CAT-01', '铝合金模板', '-', '320', '1', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['CAT-01-01', '标准铝合金模板', '铝合金模板', '180', '1', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['CAT-01-02', '非标铝合金模板', '铝合金模板', '95', '2', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['CAT-02', '钢模板', '-', '210', '2', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['CAT-03', '木模板', '-', '85', '3', window.Components.Badge({ text: '启用', color: 'green' })]
+    ],
+    dialogId: 'dlg-category'
+  });
+  var html = pageWrapper('产品分类', '基础设置 / 产品分类', stats, filter, table, 'dlg-category', '新增产品分类',
+    formField('分类编码') + formField('分类名称') + formField('上级分类', 'select') + formField('排序') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-category', title: '新增产品分类', content:
+    formField('分类编码') + formField('分类名称') + formField('上级分类', 'select') + formField('排序') + formField('备注', 'textarea') });
+  return html;
+};
 
-      config() {
-        return `<div class="min-h-screen bg-slate-50 flex">
-          <aside class="w-64 bg-white border-r border-slate-200">
-            <div class="h-16 flex items-center px-4 border-b border-slate-200">
-              <span class="font-semibold text-slate-900">配置中心</span>
-            </div>
-            <nav class="p-4 space-y-1">
-              ${['配置概览','版本管理','菜单配置','页面配置','角色权限','系统设置'].map((item, i) => 
-                `<a href="#config/${['overview','versions','menus','pages','roles','system'][i]}" class="flex items-center gap-3 px-3 py-2 rounded-lg ${router.current === 'config/' + ['overview','versions','menus','pages','roles','system'][i] ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}">
-                  <span>${item}</span>
-                </a>`
-              ).join('')}
-            </nav>
-          </aside>
-          <div class="flex-1 flex flex-col">
-            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-              <h1 class="text-lg font-semibold">配置概览</h1>
-              <div class="flex gap-2">
-                ${Components.Button({ children: '导出配置', variant: 'outline' })}
-                ${Components.Button({ children: '导入配置', variant: 'outline' })}
-                ${Components.Button({ children: '保存更改' })}
-              </div>
-            </header>
-            <main class="flex-1 p-6 overflow-auto">
-              ${Components.Card({ title: '当前版本', children: `
-                <div class="flex items-center justify-between">
-                  <div>
-                    <div class="text-2xl font-bold">v1.0.0</div>
-                    <p class="text-slate-500">系统初始版本</p>
-                  </div>
-                  ${Components.Badge({ children: '当前版本', variant: 'success' })}
-                </div>
-              ` })}
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                ${Components.Card({ children: `<div class="text-2xl font-bold">7</div><p class="text-sm text-slate-500">一级模块</p>` })}
-                ${Components.Card({ children: `<div class="text-2xl font-bold">22</div><p class="text-sm text-slate-500">页面数量</p>` })}
-                ${Components.Card({ children: `<div class="text-2xl font-bold">5</div><p class="text-sm text-slate-500">角色数量</p>` })}
-                ${Components.Card({ children: `<div class="text-2xl font-bold">1</div><p class="text-sm text-slate-500">版本数量</p>` })}
-              </div>
-            </main>
-          </div>
-        </div>`;
-      },
+// ---------- 产品管理 ----------
+window.Pages.productManagement = function() {
+  var stats = window.Components.StatCard({ label: '产品总数', value: '1,560', icon: '&#x1F4E6;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '在库产品', value: '1,120', icon: '&#x1F4E5;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '租赁中', value: '380', icon: '&#x1F69A;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '维保中', value: '60', icon: '&#x1F527;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索产品名称/编码' }) +
+    window.Components.Select({ options: ['全部分类', '铝合金模板', '钢模板', '木模板', '支撑体系'] }) +
+    window.Components.Select({ options: ['全部状态', '在库', '租赁中', '维保中', '报废'] });
+  var table = window.Components.Table({
+    columns: ['产品编码', '产品名称', '分类', '规格型号', '单位', '库存数量', '状态'],
+    rows: [
+      ['PD-001', '标准铝合金平板', '铝合金模板', '1200×600mm', '块', '580', window.Components.Badge({ text: '在库', color: 'green' })],
+      ['PD-002', '铝合金阴角模', '铝合金模板', '300×300mm', '块', '320', window.Components.Badge({ text: '在库', color: 'green' })],
+      ['PD-003', '钢模板大面板', '钢模板', '1500×300mm', '块', '150', window.Components.Badge({ text: '租赁中', color: 'blue' })],
+      ['PD-004', '木模板覆膜板', '木模板', '1830×915mm', '张', '420', window.Components.Badge({ text: '在库', color: 'green' })],
+      ['PD-005', '可调钢支撑', '支撑体系', '1.5-4.5m', '根', '890', window.Components.Badge({ text: '维保中', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-product'
+  });
+  var html = pageWrapper('产品管理', '基础设置 / 产品管理', stats, filter, table, 'dlg-product', '新增产品',
+    formField('产品编码') + formField('产品名称') + formField('产品分类', 'select') + formField('规格型号') +
+    formField('计量单位') + formField('初始库存') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-product', title: '新增产品', content:
+    formField('产品编码') + formField('产品名称') + formField('产品分类', 'select') + formField('规格型号') +
+    formField('计量单位') + formField('初始库存') + formField('备注', 'textarea') });
+  return html;
+};
 
-      'config/system'() {
-        const config = store.systemConfig;
-        return `<div class="min-h-screen bg-slate-50 flex">
-          <aside class="w-64 bg-white border-r border-slate-200">
-            <div class="h-16 flex items-center px-4 border-b border-slate-200">
-              <span class="font-semibold text-slate-900">配置中心</span>
-            </div>
-            <nav class="p-4 space-y-1">
-              ${['配置概览','版本管理','菜单配置','页面配置','角色权限','系统设置'].map((item, i) => 
-                `<a href="#config/${['overview','versions','menus','pages','roles','system'][i]}" class="flex items-center gap-3 px-3 py-2 rounded-lg ${router.current === 'config/' + ['overview','versions','menus','pages','roles','system'][i] ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}">
-                  <span>${item}</span>
-                </a>`
-              ).join('')}
-            </nav>
-          </aside>
-          <div class="flex-1 flex flex-col">
-            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-              <h1 class="text-lg font-semibold">系统设置</h1>
-              <div class="flex gap-2">
-                ${Components.Button({ children: '导出配置', variant: 'outline' })}
-                ${Components.Button({ children: '导入配置', variant: 'outline' })}
-                ${Components.Button({ children: '保存更改', onClick: 'saveSystemConfig()' })}
-              </div>
-            </header>
-            <main class="flex-1 p-6 overflow-auto">
-              <div class="max-w-2xl space-y-6">
-                ${Components.Card({ title: '基本信息', children: `
-                  ${Components.Input({ label: '系统名称', value: config.name, onChange: 'updateConfig("name", this.value)' })}
-                  ${Components.Select({ label: '主题', value: config.theme, options: [{value:'light',label:'浅色主题'},{value:'dark',label:'深色主题'}], onChange: 'updateConfig("theme", this.value)' })}
-                  ${Components.Select({ label: '布局', value: config.layout, options: [{value:'sidebar',label:'侧边栏布局'},{value:'topbar',label:'顶部导航'}], onChange: 'updateConfig("layout", this.value)' })}
-                ` })}
-                ${Components.Card({ title: '功能开关', children: `
-                  ${Components.Switch({ label: '启用通知', checked: config.enableNotification, onChange: 'toggleConfig("enableNotification")' })}
-                  ${Components.Switch({ label: '启用审计日志', checked: config.enableAuditLog, onChange: 'toggleConfig("enableAuditLog")' })}
-                ` })}
-              </div>
-            </main>
-          </div>
-        </div>`;
-      },
+// ---------- BOM清单 ----------
+window.Pages.bom = function() {
+  var stats = window.Components.StatCard({ label: 'BOM总数', value: '45', icon: '&#x1F4DD;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '已审核', value: '38', icon: '&#x2705;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '待审核', value: '5', icon: '&#x23F3;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '已停用', value: '2', icon: '&#x274C;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索BOM编号/名称' }) +
+    window.Components.Select({ options: ['全部状态', '已审核', '待审核', '草稿', '已停用'] });
+  var table = window.Components.Table({
+    columns: ['BOM编号', 'BOM名称', '产品分类', '子项数量', '版本', '创建人', '状态'],
+    rows: [
+      ['BOM-001', '标准层铝合金模板BOM', '铝合金模板', '28', 'V2.1', '张伟', window.Components.Badge({ text: '已审核', color: 'green' })],
+      ['BOM-002', '地下室钢模板BOM', '钢模板', '35', 'V1.3', '李明', window.Components.Badge({ text: '已审核', color: 'green' })],
+      ['BOM-003', '楼梯段模板BOM', '铝合金模板', '18', 'V1.0', '王强', window.Components.Badge({ text: '待审核', color: 'yellow' })],
+      ['BOM-004', '电梯井模板BOM', '钢模板', '22', 'V1.5', '赵敏', window.Components.Badge({ text: '已审核', color: 'green' })],
+      ['BOM-005', '飘窗模板BOM', '铝合金模板', '12', 'V1.2', '陈刚', window.Components.Badge({ text: '草稿', color: 'gray' })]
+    ],
+    dialogId: 'dlg-bom'
+  });
+  var html = pageWrapper('BOM清单', '基础设置 / BOM清单', stats, filter, table, 'dlg-bom', '新增BOM',
+    formField('BOM编号') + formField('BOM名称') + formField('产品分类', 'select') + formField('版本号') +
+    formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-bom', title: '新增BOM', content:
+    formField('BOM编号') + formField('BOM名称') + formField('产品分类', 'select') + formField('版本号') +
+    formField('备注', 'textarea') });
+  return html;
+};
 
-      sidebar() {
-        const menus = [
-          { label: '基础设置', children: [{l:'仓库设置',p:'warehouse'},{l:'产品分类',p:'product-category'},{l:'产品管理',p:'product-management'},{l:'BOM清单',p:'bom'},{l:'摊销规则',p:'amortization'},{l:'租赁规则',p:'rental'}] },
-          { label: '资产仓库', children: [{l:'资产地图',p:'map'},{l:'仓库管理',p:'management'}] },
-          { label: '订单管理', children: [{l:'租赁订单',p:'rental-order'},{l:'调拨订单',p:'transfer-order'},{l:'采购订单',p:'purchase-order'}] },
-          { label: '设计管理', children: [{l:'设计档案库',p:'archive'}] },
-          { label: '资产管理', children: [{l:'出库管理',p:'outbound'},{l:'入库管理',p:'inbound'},{l:'盘点管理',p:'inventory-check'},{l:'维保管理',p:'maintenance'},{l:'废旧处置',p:'disposal'},{l:'翻新管理',p:'refurbishment'}] },
-          { label: '结算管理', children: [{l:'内部结算',p:'internal-settlement'},{l:'外部结算',p:'external-settlement'}] },
-          { label: '统计分析', children: [{l:'库存分析',p:'inventory-analysis'},{l:'其他分析',p:'other-analysis'}] },
-        ];
-        return `<aside class="w-64 bg-white border-r border-slate-200 flex-shrink-0">
-          <div class="h-16 flex items-center px-4 border-b border-slate-200">
-            <span class="font-semibold text-slate-900">模架工装系统</span>
-          </div>
-          <nav class="p-2 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
-            ${menus.map(m => `
-              <div class="space-y-1">
-                <div class="px-3 py-2 text-sm font-medium text-slate-900">${m.label}</div>
-                ${m.children.map(c => `
-                  <a href="#${c.p}" class="block px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg ${router.current === c.p ? 'bg-blue-50 text-blue-600' : ''}">${c.l}</a>
-                `).join('')}
-              </div>
-            `).join('')}
-          </nav>
-        </aside>`;
-      },
+// ---------- 摊销规则 ----------
+window.Pages.amortization = function() {
+  var stats = window.Components.StatCard({ label: '规则总数', value: '12', icon: '&#x1F4C4;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '启用规则', value: '9', icon: '&#x2705;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '产品分类覆盖', value: '8/8', icon: '&#x1F4CB;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '平均摊销年限', value: '3.5年', icon: '&#x1F4C5;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索规则名称' }) +
+    window.Components.Select({ options: ['全部状态', '启用', '停用'] });
+  var table = window.Components.Table({
+    columns: ['规则编号', '规则名称', '适用分类', '摊销方式', '摊销年限', '残值率', '状态'],
+    rows: [
+      ['AM-001', '铝合金模板标准摊销', '铝合金模板', '直线法', '5年', '5%', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['AM-002', '钢模板加速摊销', '钢模板', '双倍余额法', '4年', '3%', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['AM-003', '木模板快速摊销', '木模板', '直线法', '2年', '0%', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['AM-004', '支撑体系标准摊销', '支撑体系', '直线法', '6年', '8%', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['AM-005', '零星配件摊销', '配件类', '一次摊销', '-', '0%', window.Components.Badge({ text: '停用', color: 'red' })]
+    ],
+    dialogId: 'dlg-amortization'
+  });
+  var html = pageWrapper('摊销规则', '基础设置 / 摊销规则', stats, filter, table, 'dlg-amortization', '新增摊销规则',
+    formField('规则名称') + formField('适用分类', 'select') + formField('摊销方式', 'select') + formField('摊销年限') +
+    formField('残值率(%)') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-amortization', title: '新增摊销规则', content:
+    formField('规则名称') + formField('适用分类', 'select') + formField('摊销方式', 'select') + formField('摊销年限') +
+    formField('残值率(%)') + formField('备注', 'textarea') });
+  return html;
+};
 
-      header(title) {
-        return `<header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-          <div class="flex items-center gap-4">
-            <h1 class="text-lg font-semibold">${title}</h1>
-            <span class="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">v1.0.0</span>
-          </div>
-          <div class="flex items-center gap-2">
-            ${Components.Button({ children: '编辑模式', variant: 'outline' })}
-            ${Components.Button({ children: '配置', variant: 'outline', onClick: 'window.router.navigate("config")' })}
-          </div>
-        </header>`;
-      }
-    };
+// ---------- 租赁规则 ----------
+window.Pages.rental = function() {
+  var stats = window.Components.StatCard({ label: '规则总数', value: '15', icon: '&#x1F4C4;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '启用规则', value: '12', icon: '&#x2705;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '最低租赁天数', value: '30天', icon: '&#x1F4C5;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '平均日租金', value: '¥8.5', icon: '&#x1F4B0;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索规则名称' }) +
+    window.Components.Select({ options: ['全部状态', '启用', '停用'] });
+  var table = window.Components.Table({
+    columns: ['规则编号', '规则名称', '适用产品', '计费方式', '日租金(元)', '最短租期', '状态'],
+    rows: [
+      ['RT-001', '铝合金标准模板租赁', '标准铝合金模板', '按天计费', '8.50', '30天', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['RT-002', '钢模板租赁', '钢模板', '按天计费', '12.00', '30天', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['RT-003', '木模板租赁', '木模板', '按月计费', '180.00', '1个月', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['RT-004', '支撑体系租赁', '可调钢支撑', '按天计费', '3.50', '15天', window.Components.Badge({ text: '启用', color: 'green' })],
+      ['RT-005', '非标模板定制租赁', '非标铝合金模板', '按天计费', '15.00', '60天', window.Components.Badge({ text: '停用', color: 'red' })]
+    ],
+    dialogId: 'dlg-rental'
+  });
+  var html = pageWrapper('租赁规则', '基础设置 / 租赁规则', stats, filter, table, 'dlg-rental', '新增租赁规则',
+    formField('规则名称') + formField('适用产品', 'select') + formField('计费方式', 'select') + formField('日租金(元)') +
+    formField('最短租期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-rental', title: '新增租赁规则', content:
+    formField('规则名称') + formField('适用产品', 'select') + formField('计费方式', 'select') + formField('日租金(元)') +
+    formField('最短租期') + formField('备注', 'textarea') });
+  return html;
+};
 
-    // 全局函数
-    window.router = router;
-    window.Pages = Pages;
-    window.render = render;
-    window.showDialog = (id) => document.getElementById(id).hidden = false;
-    window.hideDialog = (id) => document.getElementById(id).hidden = true;
-    window.updateConfig = (key, value) => {
-      store.systemConfig[key] = value;
-      store.save('systemConfig', store.systemConfig);
-    };
-    window.toggleConfig = (key) => {
-      store.systemConfig[key] = !store.systemConfig[key];
-      store.save('systemConfig', store.systemConfig);
-      render();
-    };
-    window.saveSystemConfig = () => {
-      alert('配置已保存！');
-    };
+// ---------- 资产地图 ----------
+window.Pages.map = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">资产地图</h1><p class="text-sm text-gray-500 mt-1">资产仓库 / 资产地图</p></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+  html += window.Components.StatCard({ label: '仓库分布', value: '12城市', icon: '&#x1F5FA;', colorIndex: 4 });
+  html += window.Components.StatCard({ label: '总资产数', value: '52,380', icon: '&#x1F4E6;', colorIndex: 0 });
+  html += window.Components.StatCard({ label: '利用率', value: '78.5%', icon: '&#x1F4C8;', colorIndex: 1 });
+  html += window.Components.StatCard({ label: '预警仓库', value: '3', icon: '&#x26A0;', colorIndex: 2 });
+  html += '</div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">仓库分布概览</h2>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-3 gap-6">';
+  var regions = [
+    { name: '华东区域', warehouses: 8, items: '18,500', rate: '82%', color: 'blue' },
+    { name: '华南区域', warehouses: 6, items: '12,300', rate: '75%', color: 'green' },
+    { name: '华北区域', warehouses: 5, items: '9,800', rate: '80%', color: 'orange' },
+    { name: '西南区域', warehouses: 4, items: '6,200', rate: '68%', color: 'purple' },
+    { name: '华中区域', warehouses: 3, items: '3,980', rate: '85%', color: 'teal' },
+    { name: '西北区域', warehouses: 2, items: '1,600', rate: '60%', color: 'red' }
+  ];
+  for (var i = 0; i < regions.length; i++) {
+    var r = regions[i];
+    html += '<div class="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">';
+    html += '<h3 class="font-semibold text-gray-800 mb-2">' + r.name + '</h3>';
+    html += '<div class="space-y-1 text-sm text-gray-600">';
+    html += '<p>仓库数量：<span class="font-medium">' + r.warehouses + '</span></p>';
+    html += '<p>资产数量：<span class="font-medium">' + r.items + '</span></p>';
+    html += '<p>利用率：<span class="font-medium text-primary">' + r.rate + '</span></p>';
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">资产预警</h2>';
+  html += '<div class="space-y-3">';
+  var warnings = [
+    { level: '高', text: '西南中转仓库存不足，铝合金模板剩余不足 20%', time: '10分钟前' },
+    { level: '中', text: '华北项目仓即将满仓，当前利用率 95%', time: '1小时前' },
+    { level: '低', text: '西北仓库多批次产品即将到达摊销年限', time: '3小时前' }
+  ];
+  for (var j = 0; j < warnings.length; j++) {
+    var w = warnings[j];
+    var wColor = w.level === '高' ? 'red' : (w.level === '中' ? 'yellow' : 'blue');
+    html += '<div class="flex items-center gap-3 py-2 border-b border-gray-50">';
+    html += window.Components.Badge({ text: w.level, color: wColor });
+    html += '<span class="text-sm text-gray-600 flex-1">' + w.text + '</span>';
+    html += '<span class="text-xs text-gray-400">' + w.time + '</span></div>';
+  }
+  html += '</div></div></div>';
+  return html;
+};
 
-    // 渲染函数
-    function render() {
-      const page = window.router.current;
-      const pageFn = window.Pages[page] || window.Pages['config/system'];
-      document.getElementById('app').innerHTML = pageFn();
+// ---------- 仓库管理 ----------
+window.Pages.management = function() {
+  var stats = window.Components.StatCard({ label: '仓库总数', value: '28', icon: '&#x1F3ED;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '库位总数', value: '1,240', icon: '&#x1F4C6;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '已用库位', value: '980', icon: '&#x1F4C5;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '空置率', value: '21%', icon: '&#x1F4CA;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索仓库名称' }) +
+    window.Components.Select({ options: ['全部区域', '华东', '华南', '华北', '西南', '华中', '西北'] });
+  var table = window.Components.Table({
+    columns: ['仓库名称', '区域', '库位总数', '已用库位', '利用率', '面积(m²)', '操作'],
+    rows: [
+      ['华东中心仓', '华东', '280', '245', '87.5%', '12,000', window.Components.Badge({ text: '正常', color: 'green' })],
+      ['华南中心仓', '华南', '220', '180', '81.8%', '9,500', window.Components.Badge({ text: '正常', color: 'green' })],
+      ['华北项目仓', '华北', '150', '142', '94.7%', '6,800', window.Components.Badge({ text: '预警', color: 'yellow' })],
+      ['西南中转仓', '西南', '120', '95', '79.2%', '5,200', window.Components.Badge({ text: '正常', color: 'green' })],
+      ['华中中心仓', '华中', '180', '140', '77.8%', '7,600', window.Components.Badge({ text: '正常', color: 'green' })]
+    ],
+    dialogId: 'dlg-management'
+  });
+  var html = pageWrapper('仓库管理', '资产仓库 / 仓库管理', stats, filter, table, 'dlg-management', '新增仓库',
+    formField('仓库名称') + formField('所属区域', 'select') + formField('库位数量') + formField('仓库面积(m²)') +
+    formField('仓库地址') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-management', title: '新增仓库', content:
+    formField('仓库名称') + formField('所属区域', 'select') + formField('库位数量') + formField('仓库面积(m²)') +
+    formField('仓库地址') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 租赁订单 ----------
+window.Pages.rentalOrder = function() {
+  var stats = window.Components.StatCard({ label: '订单总数', value: '384', icon: '&#x1F4CB;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '进行中', value: '62', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月新增', value: '18', icon: '&#x2B06;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '本月金额', value: '¥286万', icon: '&#x1F4B0;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索订单编号/项目名称' }) +
+    window.Components.Select({ options: ['全部状态', '待审批', '进行中', '已完成', '已取消'] }) +
+    window.Components.Select({ options: ['全部时间', '本月', '本季度', '本年度'] });
+  var table = window.Components.Table({
+    columns: ['订单编号', '项目名称', '承租方', '租赁开始', '租赁结束', '金额(元)', '状态'],
+    rows: [
+      ['LZ-2026-0384', '万科城市花园二期', '中建三局', '2026-03-01', '2026-09-30', '458,000', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['LZ-2026-0385', '碧桂园星悦湾', '中建五局', '2026-04-15', '2026-12-31', '682,000', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['LZ-2026-0386', '保利天悦', '中铁建工', '2026-05-01', '2026-11-30', '326,000', window.Components.Badge({ text: '待审批', color: 'yellow' })],
+      ['LZ-2026-0381', '龙湖春江天境', '中建一局', '2026-01-10', '2026-06-30', '215,000', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['LZ-2026-0380', '融创壹号院', '中建八局', '2025-11-01', '2026-04-30', '530,000', window.Components.Badge({ text: '已完成', color: 'green' })]
+    ],
+    dialogId: 'dlg-rental-order'
+  });
+  var html = pageWrapper('租赁订单', '订单管理 / 租赁订单', stats, filter, table, 'dlg-rental-order', '新增租赁订单',
+    formField('项目名称') + formField('承租方') + formField('租赁开始日期') + formField('租赁结束日期') +
+    formField('预计金额(元)') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-rental-order', title: '新增租赁订单', content:
+    formField('项目名称') + formField('承租方') + formField('租赁开始日期') + formField('租赁结束日期') +
+    formField('预计金额(元)') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 调拨订单 ----------
+window.Pages.transferOrder = function() {
+  var stats = window.Components.StatCard({ label: '订单总数', value: '156', icon: '&#x1F4CB;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '进行中', value: '23', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月新增', value: '8', icon: '&#x2B06;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '调拨资产数', value: '3,450', icon: '&#x1F69A;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索订单编号' }) +
+    window.Components.Select({ options: ['全部状态', '待审批', '调拨中', '已到达', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['订单编号', '调出仓库', '调入仓库', '调拨数量', '发起日期', '预计到达', '状态'],
+    rows: [
+      ['DB-2026-0092', '华东中心仓', '华北项目仓', '500', '2026-05-10', '2026-05-15', window.Components.Badge({ text: '调拨中', color: 'blue' })],
+      ['DB-2026-0091', '华南中心仓', '西南中转仓', '300', '2026-05-08', '2026-05-14', window.Components.Badge({ text: '已到达', color: 'green' })],
+      ['DB-2026-0093', '华中中心仓', '华东中心仓', '200', '2026-05-12', '2026-05-18', window.Components.Badge({ text: '调拨中', color: 'blue' })],
+      ['DB-2026-0090', '华北项目仓', '华中中心仓', '150', '2026-05-05', '2026-05-10', window.Components.Badge({ text: '已到达', color: 'green' })],
+      ['DB-2026-0094', '华东中心仓', '华南中心仓', '400', '2026-05-15', '2026-05-20', window.Components.Badge({ text: '待审批', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-transfer-order'
+  });
+  var html = pageWrapper('调拨订单', '订单管理 / 调拨订单', stats, filter, table, 'dlg-transfer-order', '新增调拨订单',
+    formField('调出仓库', 'select') + formField('调入仓库', 'select') + formField('调拨产品', 'select') +
+    formField('调拨数量') + formField('预计到达日期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-transfer-order', title: '新增调拨订单', content:
+    formField('调出仓库', 'select') + formField('调入仓库', 'select') + formField('调拨产品', 'select') +
+    formField('调拨数量') + formField('预计到达日期') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 采购订单 ----------
+window.Pages.purchaseOrder = function() {
+  var stats = window.Components.StatCard({ label: '订单总数', value: '98', icon: '&#x1F4CB;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '进行中', value: '15', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月新增', value: '5', icon: '&#x2B06;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '本月金额', value: '¥125万', icon: '&#x1F4B0;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索订单编号/供应商' }) +
+    window.Components.Select({ options: ['全部状态', '待审批', '采购中', '已入库', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['订单编号', '供应商', '产品名称', '采购数量', '金额(元)', '下单日期', '状态'],
+    rows: [
+      ['CG-2026-0045', '中建科技', '铝合金标准平板', '1000', '350,000', '2026-05-01', window.Components.Badge({ text: '采购中', color: 'blue' })],
+      ['CG-2026-0046', '三一重工', '可调钢支撑', '500', '125,000', '2026-05-05', window.Components.Badge({ text: '待审批', color: 'yellow' })],
+      ['CG-2026-0044', '山东铝业', '铝合金阴角模', '800', '200,000', '2026-04-28', window.Components.Badge({ text: '已入库', color: 'green' })],
+      ['CG-2026-0043', '宝钢集团', '钢模板大面板', '300', '180,000', '2026-04-25', window.Components.Badge({ text: '已入库', color: 'green' })],
+      ['CG-2026-0047', '远大住工', '木模板覆膜板', '2000', '160,000', '2026-05-10', window.Components.Badge({ text: '采购中', color: 'blue' })]
+    ],
+    dialogId: 'dlg-purchase-order'
+  });
+  var html = pageWrapper('采购订单', '订单管理 / 采购订单', stats, filter, table, 'dlg-purchase-order', '新增采购订单',
+    formField('供应商') + formField('产品名称', 'select') + formField('采购数量') + formField('单价(元)') +
+    formField('交货日期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-purchase-order', title: '新增采购订单', content:
+    formField('供应商') + formField('产品名称', 'select') + formField('采购数量') + formField('单价(元)') +
+    formField('交货日期') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 设计档案库 ----------
+window.Pages.archive = function() {
+  var stats = window.Components.StatCard({ label: '档案总数', value: '268', icon: '&#x1F4DA;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '本月新增', value: '12', icon: '&#x2B06;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '版本总数', value: '856', icon: '&#x1F504;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '关联BOM', value: '45', icon: '&#x1F517;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索档案名称/编号' }) +
+    window.Components.Select({ options: ['全部类型', '模板设计', '支撑设计', '配筋设计', '其他'] });
+  var table = window.Components.Table({
+    columns: ['档案编号', '档案名称', '类型', '设计人', '版本', '更新日期', '状态'],
+    rows: [
+      ['DA-001', '万科花园标准层模板设计', '模板设计', '张伟', 'V3.2', '2026-05-10', window.Components.Badge({ text: '已发布', color: 'green' })],
+      ['DA-002', '碧桂园地下室支撑体系', '支撑设计', '李明', 'V2.1', '2026-05-08', window.Components.Badge({ text: '审核中', color: 'yellow' })],
+      ['DA-003', '保利天悦核心筒设计', '模板设计', '王强', 'V1.5', '2026-05-05', window.Components.Badge({ text: '已发布', color: 'green' })],
+      ['DA-004', '龙湖高层标准层配筋', '配筋设计', '赵敏', 'V1.0', '2026-04-28', window.Components.Badge({ text: '草稿', color: 'gray' })],
+      ['DA-005', '融创别墅异形模板', '模板设计', '陈刚', 'V2.0', '2026-04-25', window.Components.Badge({ text: '已发布', color: 'green' })]
+    ],
+    dialogId: 'dlg-archive'
+  });
+  var html = pageWrapper('设计档案库', '设计管理 / 设计档案库', stats, filter, table, 'dlg-archive', '新增设计档案',
+    formField('档案名称') + formField('档案类型', 'select') + formField('设计人') + formField('关联项目') +
+    formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-archive', title: '新增设计档案', content:
+    formField('档案名称') + formField('档案类型', 'select') + formField('设计人') + formField('关联项目') +
+    formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 出库管理 ----------
+window.Pages.outbound = function() {
+  var stats = window.Components.StatCard({ label: '出库单数', value: '523', icon: '&#x1F69A;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '本月出库', value: '45', icon: '&#x2B06;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '出库资产数', value: '12,680', icon: '&#x1F4E6;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '待审核', value: '8', icon: '&#x23F3;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索出库单号' }) +
+    window.Components.Select({ options: ['全部类型', '租赁出库', '调拨出库', '报废出库'] }) +
+    window.Components.Select({ options: ['全部状态', '待审核', '已审核', '已出库', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['出库单号', '出库类型', '目标方', '产品名称', '数量', '出库日期', '状态'],
+    rows: [
+      ['CK-2026-0456', '租赁出库', '中建三局-万科花园', '铝合金标准平板', '200', '2026-05-12', window.Components.Badge({ text: '已出库', color: 'green' })],
+      ['CK-2026-0457', '调拨出库', '华北项目仓', '可调钢支撑', '150', '2026-05-13', window.Components.Badge({ text: '待审核', color: 'yellow' })],
+      ['CK-2026-0455', '租赁出库', '中建五局-碧桂园', '钢模板大面板', '180', '2026-05-11', window.Components.Badge({ text: '已出库', color: 'green' })],
+      ['CK-2026-0458', '报废出库', '废旧物资仓', '木模板覆膜板', '50', '2026-05-14', window.Components.Badge({ text: '已审核', color: 'blue' })],
+      ['CK-2026-0459', '租赁出库', '中铁建工-保利天悦', '铝合金阴角模', '120', '2026-05-15', window.Components.Badge({ text: '待审核', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-outbound'
+  });
+  var html = pageWrapper('出库管理', '资产管理 / 出库管理', stats, filter, table, 'dlg-outbound', '新增出库单',
+    formField('出库类型', 'select') + formField('目标方') + formField('出库仓库', 'select') +
+    formField('产品名称', 'select') + formField('出库数量') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-outbound', title: '新增出库单', content:
+    formField('出库类型', 'select') + formField('目标方') + formField('出库仓库', 'select') +
+    formField('产品名称', 'select') + formField('出库数量') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 入库管理 ----------
+window.Pages.inbound = function() {
+  var stats = window.Components.StatCard({ label: '入库单数', value: '486', icon: '&#x1F4E5;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '本月入库', value: '38', icon: '&#x2B06;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '入库资产数', value: '11,200', icon: '&#x1F4E6;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '待检验', value: '5', icon: '&#x23F3;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索入库单号' }) +
+    window.Components.Select({ options: ['全部类型', '采购入库', '退货入库', '调拨入库', '翻新入库'] }) +
+    window.Components.Select({ options: ['全部状态', '待检验', '已检验', '已入库', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['入库单号', '入库类型', '来源方', '产品名称', '数量', '入库日期', '状态'],
+    rows: [
+      ['RK-2026-0401', '采购入库', '中建科技', '铝合金标准平板', '500', '2026-05-12', window.Components.Badge({ text: '已入库', color: 'green' })],
+      ['RK-2026-0402', '退货入库', '中建三局-万科花园', '铝合金阴角模', '80', '2026-05-13', window.Components.Badge({ text: '待检验', color: 'yellow' })],
+      ['RK-2026-0403', '调拨入库', '华南中心仓', '可调钢支撑', '200', '2026-05-14', window.Components.Badge({ text: '已入库', color: 'green' })],
+      ['RK-2026-0404', '翻新入库', '翻新车间', '钢模板大面板', '100', '2026-05-14', window.Components.Badge({ text: '已检验', color: 'blue' })],
+      ['RK-2026-0405', '采购入库', '三一重工', '可调钢支撑', '300', '2026-05-15', window.Components.Badge({ text: '待检验', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-inbound'
+  });
+  var html = pageWrapper('入库管理', '资产管理 / 入库管理', stats, filter, table, 'dlg-inbound', '新增入库单',
+    formField('入库类型', 'select') + formField('来源方') + formField('入库仓库', 'select') +
+    formField('产品名称', 'select') + formField('入库数量') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-inbound', title: '新增入库单', content:
+    formField('入库类型', 'select') + formField('来源方') + formField('入库仓库', 'select') +
+    formField('产品名称', 'select') + formField('入库数量') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 盘点管理 ----------
+window.Pages.inventoryCheck = function() {
+  var stats = window.Components.StatCard({ label: '盘点任务', value: '86', icon: '&#x1F4DD;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '进行中', value: '5', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月完成', value: '8', icon: '&#x2705;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '差异率', value: '0.8%', icon: '&#x1F4CA;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索盘点单号' }) +
+    window.Components.Select({ options: ['全部状态', '待执行', '执行中', '已完成', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['盘点单号', '盘点仓库', '盘点类型', '盘点人', '计划日期', '差异数', '状态'],
+    rows: [
+      ['PD-CK-2026-018', '华东中心仓', '月度盘点', '张伟', '2026-05-15', '3', window.Components.Badge({ text: '执行中', color: 'blue' })],
+      ['PD-CK-2026-017', '华南中心仓', '月度盘点', '李明', '2026-05-14', '1', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['PD-CK-2026-019', '华北项目仓', '临时盘点', '王强', '2026-05-16', '-', window.Components.Badge({ text: '待执行', color: 'yellow' })],
+      ['PD-CK-2026-016', '华中中心仓', '月度盘点', '陈刚', '2026-05-13', '2', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['PD-CK-2026-020', '西南中转仓', '季度盘点', '赵敏', '2026-05-20', '-', window.Components.Badge({ text: '待执行', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-inventory-check'
+  });
+  var html = pageWrapper('盘点管理', '资产管理 / 盘点管理', stats, filter, table, 'dlg-inventory-check', '新增盘点任务',
+    formField('盘点仓库', 'select') + formField('盘点类型', 'select') + formField('盘点人') +
+    formField('计划日期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-inventory-check', title: '新增盘点任务', content:
+    formField('盘点仓库', 'select') + formField('盘点类型', 'select') + formField('盘点人') +
+    formField('计划日期') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 维保管理 ----------
+window.Pages.maintenance = function() {
+  var stats = window.Components.StatCard({ label: '维保工单', value: '234', icon: '&#x1F527;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '进行中', value: '18', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月完成', value: '32', icon: '&#x2705;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '维保费用', value: '¥45.6万', icon: '&#x1F4B0;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索工单号' }) +
+    window.Components.Select({ options: ['全部类型', '日常维保', '定期保养', '故障维修'] }) +
+    window.Components.Select({ options: ['全部状态', '待派工', '进行中', '已完成', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['工单号', '产品名称', '维保类型', '维保人', '费用(元)', '开始日期', '状态'],
+    rows: [
+      ['WB-2026-0156', '铝合金标准平板', '定期保养', '刘师傅', '2,500', '2026-05-10', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['WB-2026-0157', '可调钢支撑', '故障维修', '张师傅', '800', '2026-05-12', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['WB-2026-0158', '钢模板大面板', '日常维保', '王师傅', '1,200', '2026-05-13', window.Components.Badge({ text: '待派工', color: 'yellow' })],
+      ['WB-2026-0159', '铝合金阴角模', '定期保养', '李师傅', '1,800', '2026-05-14', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['WB-2026-0155', '木模板覆膜板', '日常维保', '赵师傅', '600', '2026-05-09', window.Components.Badge({ text: '已完成', color: 'green' })]
+    ],
+    dialogId: 'dlg-maintenance'
+  });
+  var html = pageWrapper('维保管理', '资产管理 / 维保管理', stats, filter, table, 'dlg-maintenance', '新增维保工单',
+    formField('产品名称', 'select') + formField('维保类型', 'select') + formField('维保人') +
+    formField('预计费用(元)') + formField('计划日期') + formField('故障描述', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-maintenance', title: '新增维保工单', content:
+    formField('产品名称', 'select') + formField('维保类型', 'select') + formField('维保人') +
+    formField('预计费用(元)') + formField('计划日期') + formField('故障描述', 'textarea') });
+  return html;
+};
+
+// ---------- 废旧处置 ----------
+window.Pages.disposal = function() {
+  var stats = window.Components.StatCard({ label: '处置单数', value: '67', icon: '&#x1F5D1;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '待审批', value: '4', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '已处置资产', value: '2,350', icon: '&#x1F4E6;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '回收金额', value: '¥86.5万', icon: '&#x1F4B0;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索处置单号' }) +
+    window.Components.Select({ options: ['全部方式', '报废出售', '回收利用', '捐赠', '销毁'] }) +
+    window.Components.Select({ options: ['全部状态', '待审批', '进行中', '已完成', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['处置单号', '产品名称', '处置方式', '数量', '残值(元)', '申请日期', '状态'],
+    rows: [
+      ['FJ-2026-0023', '木模板覆膜板', '回收利用', '200', '3,000', '2026-05-10', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['FJ-2026-0024', '铝合金标准平板', '报废出售', '50', '15,000', '2026-05-12', window.Components.Badge({ text: '待审批', color: 'yellow' })],
+      ['FJ-2026-0025', '可调钢支撑', '报废出售', '30', '4,500', '2026-05-13', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['FJ-2026-0022', '钢模板大面板', '回收利用', '80', '8,000', '2026-05-08', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['FJ-2026-0026', '铝合金阴角模', '销毁', '20', '0', '2026-05-14', window.Components.Badge({ text: '待审批', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-disposal'
+  });
+  var html = pageWrapper('废旧处置', '资产管理 / 废旧处置', stats, filter, table, 'dlg-disposal', '新增处置单',
+    formField('产品名称', 'select') + formField('处置方式', 'select') + formField('处置数量') +
+    formField('预估残值(元)') + formField('处置原因', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-disposal', title: '新增处置单', content:
+    formField('产品名称', 'select') + formField('处置方式', 'select') + formField('处置数量') +
+    formField('预估残值(元)') + formField('处置原因', 'textarea') });
+  return html;
+};
+
+// ---------- 翻新管理 ----------
+window.Pages.refurbishment = function() {
+  var stats = window.Components.StatCard({ label: '翻新工单', value: '89', icon: '&#x1F504;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '进行中', value: '12', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月完成', value: '15', icon: '&#x2705;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '翻新费用', value: '¥32.8万', icon: '&#x1F4B0;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索工单号' }) +
+    window.Components.Select({ options: ['全部类型', '表面翻新', '结构修复', '功能升级'] }) +
+    window.Components.Select({ options: ['全部状态', '待审批', '进行中', '已完成', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['工单号', '产品名称', '翻新类型', '数量', '费用(元)', '完成日期', '状态'],
+    rows: [
+      ['FX-2026-0034', '铝合金标准平板', '表面翻新', '100', '8,000', '2026-05-18', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['FX-2026-0033', '钢模板大面板', '结构修复', '50', '6,500', '2026-05-15', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['FX-2026-0035', '可调钢支撑', '功能升级', '80', '12,000', '2026-05-20', window.Components.Badge({ text: '进行中', color: 'blue' })],
+      ['FX-2026-0032', '铝合金阴角模', '表面翻新', '60', '3,600', '2026-05-12', window.Components.Badge({ text: '已完成', color: 'green' })],
+      ['FX-2026-0036', '木模板覆膜板', '表面翻新', '150', '4,500', '2026-05-22', window.Components.Badge({ text: '待审批', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-refurbishment'
+  });
+  var html = pageWrapper('翻新管理', '资产管理 / 翻新管理', stats, filter, table, 'dlg-refurbishment', '新增翻新工单',
+    formField('产品名称', 'select') + formField('翻新类型', 'select') + formField('翻新数量') +
+    formField('预计费用(元)') + formField('计划完成日期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-refurbishment', title: '新增翻新工单', content:
+    formField('产品名称', 'select') + formField('翻新类型', 'select') + formField('翻新数量') +
+    formField('预计费用(元)') + formField('计划完成日期') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 内部结算 ----------
+window.Pages.internalSettlement = function() {
+  var stats = window.Components.StatCard({ label: '结算单数', value: '156', icon: '&#x1F4CB;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '待结算', value: '12', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月金额', value: '¥568万', icon: '&#x1F4B0;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '结算率', value: '92.3%', icon: '&#x1F4C8;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索结算单号' }) +
+    window.Components.Select({ options: ['全部状态', '待结算', '结算中', '已结算', '已取消'] });
+  var table = window.Components.Table({
+    columns: ['结算单号', '关联订单', '结算方', '结算金额(元)', '结算周期', '结算日期', '状态'],
+    rows: [
+      ['JS-N-2026-0078', 'LZ-2026-0384', '华东分公司', '228,000', '2026年3月', '2026-05-10', window.Components.Badge({ text: '已结算', color: 'green' })],
+      ['JS-N-2026-0079', 'LZ-2026-0385', '华南分公司', '341,000', '2026年4月', '2026-05-12', window.Components.Badge({ text: '结算中', color: 'blue' })],
+      ['JS-N-2026-0080', 'DB-2026-0092', '华北分公司', '45,000', '2026年5月', '-', window.Components.Badge({ text: '待结算', color: 'yellow' })],
+      ['JS-N-2026-0077', 'LZ-2026-0381', '华中分公司', '107,500', '2026年2月', '2026-05-08', window.Components.Badge({ text: '已结算', color: 'green' })],
+      ['JS-N-2026-0081', 'LZ-2026-0386', '华东分公司', '163,000', '2026年5月', '-', window.Components.Badge({ text: '待结算', color: 'yellow' })]
+    ],
+    dialogId: 'dlg-internal-settlement'
+  });
+  var html = pageWrapper('内部结算', '结算管理 / 内部结算', stats, filter, table, 'dlg-internal-settlement', '新增结算单',
+    formField('关联订单', 'select') + formField('结算方', 'select') + formField('结算金额(元)') +
+    formField('结算周期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-internal-settlement', title: '新增结算单', content:
+    formField('关联订单', 'select') + formField('结算方', 'select') + formField('结算金额(元)') +
+    formField('结算周期') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 外部结算 ----------
+window.Pages.externalSettlement = function() {
+  var stats = window.Components.StatCard({ label: '结算单数', value: '203', icon: '&#x1F4CB;', colorIndex: 0 }) +
+    window.Components.StatCard({ label: '待收款', value: '18', icon: '&#x23F3;', colorIndex: 1 }) +
+    window.Components.StatCard({ label: '本月回款', value: '¥892万', icon: '&#x1F4B0;', colorIndex: 2 }) +
+    window.Components.StatCard({ label: '回款率', value: '88.5%', icon: '&#x1F4C8;', colorIndex: 3 });
+  var filter = window.Components.Input({ placeholder: '搜索结算单号/客户' }) +
+    window.Components.Select({ options: ['全部状态', '待结算', '已开票', '已收款', '逾期'] });
+  var table = window.Components.Table({
+    columns: ['结算单号', '客户名称', '关联订单', '结算金额(元)', '开票状态', '到期日期', '状态'],
+    rows: [
+      ['JS-W-2026-0102', '中建三局', 'LZ-2026-0384', '458,000', '已开票', '2026-06-30', window.Components.Badge({ text: '已收款', color: 'green' })],
+      ['JS-W-2026-0103', '中建五局', 'LZ-2026-0385', '682,000', '已开票', '2026-07-15', window.Components.Badge({ text: '待收款', color: 'yellow' })],
+      ['JS-W-2026-0104', '中铁建工', 'LZ-2026-0386', '326,000', '未开票', '2026-08-31', window.Components.Badge({ text: '待结算', color: 'blue' })],
+      ['JS-W-2026-0101', '中建一局', 'LZ-2026-0381', '215,000', '已开票', '2026-05-31', window.Components.Badge({ text: '已收款', color: 'green' })],
+      ['JS-W-2026-0100', '中建八局', 'LZ-2026-0380', '530,000', '已开票', '2026-05-15', window.Components.Badge({ text: '逾期', color: 'red' })]
+    ],
+    dialogId: 'dlg-external-settlement'
+  });
+  var html = pageWrapper('外部结算', '结算管理 / 外部结算', stats, filter, table, 'dlg-external-settlement', '新增结算单',
+    formField('客户名称') + formField('关联订单', 'select') + formField('结算金额(元)') +
+    formField('到期日期') + formField('备注', 'textarea'));
+  html += window.Components.Dialog({ id: 'dlg-external-settlement', title: '新增结算单', content:
+    formField('客户名称') + formField('关联订单', 'select') + formField('结算金额(元)') +
+    formField('到期日期') + formField('备注', 'textarea') });
+  return html;
+};
+
+// ---------- 库存分析 ----------
+window.Pages.inventoryAnalysis = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">库存分析</h1><p class="text-sm text-gray-500 mt-1">统计分析 / 库存分析</p></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+  html += window.Components.StatCard({ label: '总库存量', value: '52,380', icon: '&#x1F4E6;', colorIndex: 0 });
+  html += window.Components.StatCard({ label: '库存总值', value: '¥2.8亿', icon: '&#x1F4B0;', colorIndex: 1 });
+  html += window.Components.StatCard({ label: '平均周转率', value: '3.2次/年', icon: '&#x1F504;', colorIndex: 2 });
+  html += window.Components.StatCard({ label: '呆滞库存占比', value: '5.8%', icon: '&#x26A0;', colorIndex: 3 });
+  html += '</div>';
+  html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">各仓库库存分布</h2>';
+  html += '<div class="space-y-3">';
+  var whData = [
+    { name: '华东中心仓', value: '18,500', pct: '35%', color: 'bg-blue-500' },
+    { name: '华南中心仓', value: '12,300', pct: '23%', color: 'bg-green-500' },
+    { name: '华北项目仓', value: '9,800', pct: '19%', color: 'bg-orange-500' },
+    { name: '西南中转仓', value: '6,200', pct: '12%', color: 'bg-purple-500' },
+    { name: '华中中心仓', value: '3,980', pct: '8%', color: 'bg-teal-500' },
+    { name: '其他仓库', value: '1,600', pct: '3%', color: 'bg-gray-400' }
+  ];
+  for (var i = 0; i < whData.length; i++) {
+    var d = whData[i];
+    html += '<div><div class="flex justify-between text-sm mb-1"><span>' + d.name + '</span><span class="text-gray-500">' + d.value + ' (' + d.pct + ')</span></div>';
+    html += '<div class="w-full bg-gray-100 rounded-full h-2"><div class="' + d.color + ' h-2 rounded-full" style="width:' + d.pct + '"></div></div></div>';
+  }
+  html += '</div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">产品分类库存占比</h2>';
+  html += '<div class="space-y-3">';
+  var catData = [
+    { name: '铝合金模板', value: '22,400', pct: '43%', color: 'bg-blue-500' },
+    { name: '钢模板', value: '12,600', pct: '24%', color: 'bg-green-500' },
+    { name: '支撑体系', value: '8,900', pct: '17%', color: 'bg-orange-500' },
+    { name: '木模板', value: '5,280', pct: '10%', color: 'bg-purple-500' },
+    { name: '其他配件', value: '3,200', pct: '6%', color: 'bg-gray-400' }
+  ];
+  for (var j = 0; j < catData.length; j++) {
+    var c = catData[j];
+    html += '<div><div class="flex justify-between text-sm mb-1"><span>' + c.name + '</span><span class="text-gray-500">' + c.value + ' (' + c.pct + ')</span></div>';
+    html += '<div class="w-full bg-gray-100 rounded-full h-2"><div class="' + c.color + ' h-2 rounded-full" style="width:' + c.pct + '"></div></div></div>';
+  }
+  html += '</div></div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">库存预警明细</h2>';
+  html += window.Components.Table({
+    columns: ['产品名称', '所属仓库', '当前库存', '安全库存', '缺口数量', '预警等级'],
+    rows: [
+      ['铝合金标准平板', '西南中转仓', '120', '500', '-380', window.Components.Badge({ text: '高', color: 'red' })],
+      ['可调钢支撑', '华北项目仓', '85', '200', '-115', window.Components.Badge({ text: '高', color: 'red' })],
+      ['铝合金阴角模', '华中中心仓', '150', '300', '-150', window.Components.Badge({ text: '中', color: 'yellow' })],
+      ['木模板覆膜板', '西北仓库', '200', '350', '-150', window.Components.Badge({ text: '中', color: 'yellow' })],
+      ['钢模板大面板', '华南中心仓', '280', '300', '-20', window.Components.Badge({ text: '低', color: 'blue' })]
+    ],
+    dialogId: 'dlg-inventory-analysis'
+  });
+  html += '</div></div>';
+  return html;
+};
+
+// ---------- 其他分析 ----------
+window.Pages.otherAnalysis = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">其他分析</h1><p class="text-sm text-gray-500 mt-1">统计分析 / 其他分析</p></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+  html += window.Components.StatCard({ label: '本月营收', value: '¥1,460万', icon: '&#x1F4B0;', colorIndex: 0 });
+  html += window.Components.StatCard({ label: '本月成本', value: '¥980万', icon: '&#x1F4B3;', colorIndex: 1 });
+  html += window.Components.StatCard({ label: '利润率', value: '32.9%', icon: '&#x1F4C8;', colorIndex: 2 });
+  html += window.Components.StatCard({ label: '客户满意度', value: '96.2%', icon: '&#x2B50;', colorIndex: 3 });
+  html += '</div>';
+  html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">月度营收趋势</h2>';
+  html += '<div class="space-y-2">';
+  var months = ['1月', '2月', '3月', '4月', '5月'];
+  var revenues = ['1,120', '980', '1,350', '1,280', '1,460'];
+  var maxRev = 1500;
+  for (var i = 0; i < months.length; i++) {
+    var pct = Math.round(parseInt(revenues[i].replace(/,/g, '')) / maxRev * 100);
+    html += '<div class="flex items-center gap-3"><span class="text-sm text-gray-500 w-8">' + months[i] + '</span>';
+    html += '<div class="flex-1 bg-gray-100 rounded-full h-6 relative"><div class="bg-primary h-6 rounded-full flex items-center justify-end pr-2" style="width:' + pct + '%"><span class="text-xs text-white">' + revenues[i] + '万</span></div></div></div>';
+  }
+  html += '</div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">客户租赁排行</h2>';
+  html += '<div class="space-y-3">';
+  var customers = [
+    { name: '中建三局', amount: '¥458万', orders: 12 },
+    { name: '中建五局', amount: '¥386万', orders: 9 },
+    { name: '中建八局', amount: '¥320万', orders: 8 },
+    { name: '中铁建工', amount: '¥265万', orders: 7 },
+    { name: '中建一局', amount: '¥198万', orders: 6 }
+  ];
+  for (var j = 0; j < customers.length; j++) {
+    var cu = customers[j];
+    html += '<div class="flex items-center justify-between py-2 border-b border-gray-50">';
+    html += '<div class="flex items-center gap-3"><span class="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center">' + (j + 1) + '</span>';
+    html += '<span class="font-medium text-sm">' + cu.name + '</span></div>';
+    html += '<div class="text-right"><span class="text-sm font-medium">' + cu.amount + '</span><span class="text-xs text-gray-400 ml-2">' + cu.orders + '单</span></div></div>';
+  }
+  html += '</div></div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">维保成本分析</h2>';
+  html += window.Components.Table({
+    columns: ['产品分类', '维保次数', '维保费用(元)', '平均单次费用', '费用占比'],
+    rows: [
+      ['铝合金模板', '45', '28,500', '633', '38.2%'],
+      ['钢模板', '32', '22,400', '700', '30.0%'],
+      ['支撑体系', '28', '15,200', '543', '20.4%'],
+      ['木模板', '15', '5,800', '387', '7.8%'],
+      ['其他配件', '8', '2,700', '338', '3.6%']
+    ],
+    dialogId: 'dlg-other-analysis'
+  });
+  html += '</div></div>';
+  return html;
+};
+
+// ---------- 配置中心 ----------
+window.Pages.config = function() {
+  var configItems = [
+    { name: '配置概览', hash: 'config', icon: '&#x1F3E0;', desc: '系统配置总览与快速导航' },
+    { name: '版本管理', hash: 'config/version', icon: '&#x1F504;', desc: '系统版本发布与回滚' },
+    { name: '菜单配置', hash: 'config/menu', icon: '&#x1F4CB;', desc: '菜单项管理与排序' },
+    { name: '页面配置', hash: 'config/page', icon: '&#x1F4C4;', desc: '页面布局与组件配置' },
+    { name: '角色权限', hash: 'config/role', icon: '&#x1F512;', desc: '角色定义与权限分配' },
+    { name: '系统设置', hash: 'config/system', icon: '&#x2699;', desc: '系统参数与全局配置' }
+  ];
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">配置中心</h1><p class="text-sm text-gray-500 mt-1">系统管理与配置</p></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+  html += window.Components.StatCard({ label: '配置项', value: '86', icon: '&#x2699;', colorIndex: 0 });
+  html += window.Components.StatCard({ label: '系统版本', value: 'V2.6.0', icon: '&#x1F504;', colorIndex: 1 });
+  html += window.Components.StatCard({ label: '角色数量', value: '12', icon: '&#x1F465;', colorIndex: 2 });
+  html += window.Components.StatCard({ label: '菜单数量', value: '22', icon: '&#x1F4CB;', colorIndex: 3 });
+  html += '</div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">';
+  for (var i = 0; i < configItems.length; i++) {
+    var ci = configItems[i];
+    var isActive = window.location.hash.replace('#', '') === ci.hash;
+    html += '<div onclick="window.router.navigate(\'' + ci.hash + '\')" class="cursor-pointer bg-white rounded-lg shadow-sm border ' + (isActive ? 'border-primary' : 'border-gray-200') + ' p-6 hover:shadow-md transition-shadow">';
+    html += '<div class="flex items-center gap-3 mb-2"><span class="text-2xl">' + ci.icon + '</span><h3 class="font-semibold text-gray-800">' + ci.name + '</h3></div>';
+    html += '<p class="text-sm text-gray-500">' + ci.desc + '</p></div>';
+  }
+  html += '</div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">系统信息</h2>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">';
+  var info = [
+    ['系统名称', '模架工装智能管理系统'],
+    ['系统版本', 'V2.6.0'],
+    ['部署环境', '生产环境'],
+    ['数据库', 'MySQL 8.0'],
+    ['缓存服务', 'Redis 7.0'],
+    ['最后更新', '2026-05-15']
+  ];
+  for (var j = 0; j < info.length; j++) {
+    html += '<div class="flex items-center py-2 border-b border-gray-50"><span class="text-gray-500 w-24"> ' + info[j][0] + '</span><span class="text-gray-800 font-medium">' + info[j][1] + '</span></div>';
+  }
+  html += '</div></div></div>';
+  return html;
+};
+
+// ---------- 系统设置 ----------
+window.Pages.configSystem = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">系统设置</h1><p class="text-sm text-gray-500 mt-1">配置中心 / 系统设置</p></div>';
+  html += '<div class="space-y-6">';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">基本设置</h2>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">系统名称</label><input type="text" value="模架工装智能管理系统" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">系统版本</label><input type="text" value="V2.6.0" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">公司名称</label><input type="text" value="XX建设集团" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">管理员邮箱</label><input type="text" value="admin@xxgroup.com" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '</div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">功能开关</h2>';
+  html += '<div class="space-y-4">';
+  var switches = [
+    { name: '启用消息通知', desc: '开启后系统将发送订单状态变更通知' },
+    { name: '启用库存预警', desc: '库存低于安全线时自动发送预警' },
+    { name: '启用自动结算', desc: '订单完成后自动生成结算单' },
+    { name: '启用数据备份', desc: '每日凌晨自动备份数据库' }
+  ];
+  for (var i = 0; i < switches.length; i++) {
+    html += '<div class="flex items-center justify-between py-2 border-b border-gray-50">';
+    html += '<div><p class="text-sm font-medium text-gray-800">' + switches[i].name + '</p><p class="text-xs text-gray-500">' + switches[i].desc + '</p></div>';
+    html += window.Components.Switch({ checked: i < 3 });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">安全设置</h2>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">密码最小长度</label><input type="number" value="8" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">会话超时(分钟)</label><input type="number" value="30" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">登录失败锁定次数</label><input type="number" value="5" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '<div><label class="block text-sm font-medium text-gray-700 mb-1">IP白名单</label><input type="text" placeholder="多个IP用逗号分隔" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" /></div>';
+  html += '</div></div>';
+  html += '<div class="flex justify-end"><button class="px-6 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary-hover">保存设置</button></div>';
+  html += '</div></div>';
+  return html;
+};
+
+// ---------- 配置子页面：版本管理 ----------
+window.Pages.configVersion = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">版本管理</h1><p class="text-sm text-gray-500 mt-1">配置中心 / 版本管理</p></div>';
+  html += '<div class="space-y-4">';
+  var versions = [
+    { ver: 'V2.6.0', date: '2026-05-15', desc: '新增统计分析模块，优化仓库管理流程', status: '当前版本', color: 'green' },
+    { ver: 'V2.5.0', date: '2026-04-01', desc: '新增租赁订单管理，支持订单审批流程', status: '稳定版', color: 'blue' },
+    { ver: 'V2.4.0', date: '2026-03-10', desc: '新增产品分类和BOM清单管理', status: '稳定版', color: 'blue' },
+    { ver: 'V2.3.0', date: '2026-02-15', desc: '新增资产地图功能，支持仓库可视化', status: '已归档', color: 'gray' },
+    { ver: 'V2.2.0', date: '2026-01-01', desc: '基础仓库管理功能上线', status: '已归档', color: 'gray' }
+  ];
+  for (var i = 0; i < versions.length; i++) {
+    var v = versions[i];
+    html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex items-center justify-between">';
+    html += '<div><div class="flex items-center gap-3"><span class="text-lg font-bold text-gray-800">' + v.ver + '</span><span class="px-2 py-0.5 rounded-full text-xs font-medium bg-' + v.color + '-100 text-' + v.color + '-700">' + v.status + '</span></div>';
+    html += '<p class="text-sm text-gray-600 mt-1">' + v.desc + '</p><p class="text-xs text-gray-400 mt-1">发布日期：' + v.date + '</p></div>';
+    if (v.status !== '当前版本') html += '<button class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">回滚到此版本</button>';
+    else html += '<span class="text-sm text-green-600 font-medium">✓ 运行中</span>';
+    html += '</div>';
+  }
+  html += '</div></div>';
+  return html;
+};
+
+// ---------- 配置子页面：菜单配置 ----------
+window.Pages.configMenu = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">菜单配置</h1><p class="text-sm text-gray-500 mt-1">配置中心 / 菜单配置</p></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">菜单结构</h2>';
+  html += '<p class="text-sm text-gray-500 mb-4">拖拽调整菜单顺序，点击展开/收起子菜单</p>';
+  var groups = [
+    { name: '基础设置', items: ['仓库设置', '产品分类', '产品管理', 'BOM清单', '摊销规则', '租赁规则'] },
+    { name: '资产仓库', items: ['资产地图', '仓库管理'] },
+    { name: '订单管理', items: ['租赁订单', '调拨订单', '采购订单'] },
+    { name: '设计管理', items: ['设计档案库'] },
+    { name: '资产管理', items: ['出库管理', '入库管理', '盘点管理', '维保管理', '废旧处置', '翻新管理'] },
+    { name: '结算管理', items: ['内部结算', '外部结算'] },
+    { name: '统计分析', items: ['库存分析', '其他分析'] }
+  ];
+  for (var i = 0; i < groups.length; i++) {
+    html += '<div class="border border-gray-200 rounded-lg mb-3 overflow-hidden">';
+    html += '<div class="bg-gray-50 px-4 py-3 font-medium text-gray-700 flex items-center justify-between"><span>📁 ' + groups[i].name + ' (' + groups[i].items.length + '项)</span><span class="text-xs text-gray-400">⇕ 拖拽排序</span></div>';
+    for (var j = 0; j < groups[i].items.length; j++) {
+      html += '<div class="px-4 py-2 border-t border-gray-100 text-sm text-gray-600 flex items-center justify-between"><span>　├─ ' + groups[i].items[j] + '</span><span class="text-xs text-gray-400">⇕</span></div>';
     }
+    html += '</div>';
+  }
+  html += '</div></div>';
+  return html;
+};
 
-    // 初始化
-    window.addEventListener('hashchange', () => {
-      window.router.current = window.location.hash.slice(1) || 'home';
-      window.render();
-    });
-    window.render();
-  </script>
+// ---------- 配置子页面：页面配置 ----------
+window.Pages.configPage = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">页面配置</h1><p class="text-sm text-gray-500 mt-1">配置中心 / 页面配置</p></div>';
+  html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">';
+  html += '<h2 class="text-lg font-semibold mb-4">页面列表</h2>';
+  var pages = [
+    { name: '仓库设置', path: 'warehouse', fields: 8, status: '已完成' },
+    { name: '产品分类', path: 'product-category', fields: 7, status: '已完成' },
+    { name: '产品管理', path: 'product-management', fields: 9, status: '已完成' },
+    { name: '租赁订单', path: 'rental-order', fields: 8, status: '已完成' },
+    { name: '出库管理', path: 'outbound', fields: 8, status: '已完成' },
+    { name: '库存分析', path: 'inventory-analysis', fields: 6, status: '已完成' }
+  ];
+  html += '<table class="w-full text-sm"><thead><tr class="bg-gray-50"><th class="px-4 py-2 text-left">页面名称</th><th class="px-4 py-2 text-left">路由路径</th><th class="px-4 py-2 text-center">字段数</th><th class="px-4 py-2 text-center">状态</th><th class="px-4 py-2 text-center">操作</th></tr></thead><tbody>';
+  for (var i = 0; i < pages.length; i++) {
+    var p = pages[i];
+    html += '<tr class="border-t border-gray-100"><td class="px-4 py-3">' + p.name + '</td><td class="px-4 py-3 text-gray-500">#' + p.path + '</td><td class="px-4 py-3 text-center">' + p.fields + '</td><td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">' + p.status + '</span></td><td class="px-4 py-3 text-center"><button class="text-primary text-sm hover:underline">编辑</button></td></tr>';
+  }
+  html += '</tbody></table></div></div>';
+  return html;
+};
+
+// ---------- 配置子页面：角色权限 ----------
+window.Pages.configRole = function() {
+  var html = '<div class="fade-in">';
+  html += '<div class="mb-6"><h1 class="text-2xl font-bold text-gray-800">角色权限</h1><p class="text-sm text-gray-500 mt-1">配置中心 / 角色权限</p></div>';
+  html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+  var roles = [
+    { name: '系统管理员', desc: '拥有所有功能的完整权限', users: 3, perms: '全部权限' },
+    { name: '仓库管理员', desc: '管理仓库设置、出入库、盘点', users: 12, perms: '仓库管理、资产管理' },
+    { name: '订单管理员', desc: '管理租赁、调拨、采购订单', users: 8, perms: '订单管理、结算管理' },
+    { name: '分公司负责人', desc: '查看分公司数据、审批订单', users: 5, perms: '查看、审批' },
+    { name: '项目经理', desc: '管理项目仓库、提交订单', users: 20, perms: '项目仓库、订单提交' },
+    { name: '普通员工', desc: '查看库存、提交申请', users: 45, perms: '查看、申请' }
+  ];
+  for (var i = 0; i < roles.length; i++) {
+    var r = roles[i];
+    html += '<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">';
+    html += '<div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-gray-800">' + r.name + '</h3><span class="text-xs text-gray-400">' + r.users + '人</span></div>';
+    html += '<p class="text-sm text-gray-500 mb-2">' + r.desc + '</p>';
+    html += '<div class="flex flex-wrap gap-1">';
+    var perms = r.perms.split('、');
+    for (var j = 0; j < perms.length; j++) {
+      html += '<span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">' + perms[j] + '</span>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+  return html;
+};
+
+// ==================== 菜单配置 ====================
+var menuConfig = [
+  { group: 'basic', label: '基础设置', icon: '&#x2699;', items: [
+    { label: '仓库设置', hash: 'warehouse' },
+    { label: '产品分类', hash: 'product-category' },
+    { label: '产品管理', hash: 'product-management' },
+    { label: 'BOM清单', hash: 'bom' },
+    { label: '摊销规则', hash: 'amortization' },
+    { label: '租赁规则', hash: 'rental' }
+  ]},
+  { group: 'asset-warehouse', label: '资产仓库', icon: '&#x1F3ED;', items: [
+    { label: '资产地图', hash: 'map' },
+    { label: '仓库管理', hash: 'management' }
+  ]},
+  { group: 'order', label: '订单管理', icon: '&#x1F4CB;', items: [
+    { label: '租赁订单', hash: 'rental-order' },
+    { label: '调拨订单', hash: 'transfer-order' },
+    { label: '采购订单', hash: 'purchase-order' }
+  ]},
+  { group: 'design', label: '设计管理', icon: '&#x1F3A8;', items: [
+    { label: '设计档案库', hash: 'archive' }
+  ]},
+  { group: 'asset', label: '资产管理', icon: '&#x1F4E6;', items: [
+    { label: '出库管理', hash: 'outbound' },
+    { label: '入库管理', hash: 'inbound' },
+    { label: '盘点管理', hash: 'inventory-check' },
+    { label: '维保管理', hash: 'maintenance' },
+    { label: '废旧处置', hash: 'disposal' },
+    { label: '翻新管理', hash: 'refurbishment' }
+  ]},
+  { group: 'settlement', label: '结算管理', icon: '&#x1F4B0;', items: [
+    { label: '内部结算', hash: 'internal-settlement' },
+    { label: '外部结算', hash: 'external-settlement' }
+  ]},
+  { group: 'stats', label: '统计分析', icon: '&#x1F4CA;', items: [
+    { label: '库存分析', hash: 'inventory-analysis' },
+    { label: '其他分析', hash: 'other-analysis' }
+  ]}
+];
+
+function renderMenu() {
+  var currentHash = window.location.hash.replace('#', '') || 'home';
+  var html = '';
+  html += '<div class="px-4 py-5 border-b border-gray-700">';
+  html += '<div class="flex items-center gap-3 cursor-pointer" onclick="window.router.navigate(\'home\')">';
+  html += '<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>';
+  html += '<div><h2 class="text-sm font-semibold text-white">模架工装</h2><p class="text-xs text-gray-400">智能管理系统</p></div>';
+  html += '</div></div>';
+  html += '<nav class="mt-2 px-2 sidebar-scroll" style="max-height:calc(100vh - 180px);overflow-y:auto">';
+  for (var i = 0; i < menuConfig.length; i++) {
+    var group = menuConfig[i];
+    var expanded = window.store.menuExpanded[group.group];
+    var hasActive = false;
+    for (var k = 0; k < group.items.length; k++) {
+      if (group.items[k].hash === currentHash) hasActive = true;
+    }
+    html += '<div class="mb-1">';
+    html += '<div class="flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm ' + (hasActive ? 'bg-sidebar-active text-white' : 'text-sidebar-text hover:bg-sidebar-hover') + '" onclick="window.toggleMenu(\'' + group.group + '\')">';
+    html += '<div class="flex items-center gap-2"><span>' + group.icon + '</span><span>' + group.label + '</span></div>';
+    html += '<span class="menu-arrow ' + (expanded ? 'open' : '') + '">' + (expanded ? '&#x25BC;' : '&#x25B6;') + '</span>';
+    html += '</div>';
+    if (expanded) {
+      for (var j = 0; j < group.items.length; j++) {
+        var item = group.items[j];
+        var isActive = item.hash === currentHash;
+        html += '<div class="pl-9 pr-3 py-1.5 rounded-md cursor-pointer text-sm ml-2 ' + (isActive ? 'bg-primary text-white' : 'text-sidebar-text hover:bg-sidebar-hover') + '" onclick="window.router.navigate(\'' + item.hash + '\')">';
+        html += item.label + '</div>';
+      }
+    }
+    html += '</div>';
+  }
+  html += '<div class="mt-4 pt-4 border-t border-gray-700">';
+  html += '<div class="px-3 py-2 rounded-md cursor-pointer text-sm ' + (currentHash === 'config' || currentHash.startsWith('config/') ? 'bg-sidebar-active text-white' : 'text-sidebar-text hover:bg-sidebar-hover') + '" onclick="window.router.navigate(\'config\')">';
+  html += '<div class="flex items-center gap-2"><span>&#x2699;</span><span>配置中心</span></div></div>';
+  html += '</div></nav>';
+  return html;
+}
+
+function renderTopBar() {
+  var currentHash = window.location.hash.replace('#', '') || 'home';
+  var pageTitle = '首页';
+  var pageMap = {
+    'warehouse': '仓库设置', 'product-category': '产品分类', 'product-management': '产品管理',
+    'bom': 'BOM清单', 'amortization': '摊销规则', 'rental': '租赁规则',
+    'map': '资产地图', 'management': '仓库管理',
+    'rental-order': '租赁订单', 'transfer-order': '调拨订单', 'purchase-order': '采购订单',
+    'archive': '设计档案库',
+    'outbound': '出库管理', 'inbound': '入库管理', 'inventory-check': '盘点管理',
+    'maintenance': '维保管理', 'disposal': '废旧处置', 'refurbishment': '翻新管理',
+    'internal-settlement': '内部结算', 'external-settlement': '外部结算',
+    'inventory-analysis': '库存分析', 'other-analysis': '其他分析',
+    'config': '配置中心', 'config/system': '系统设置'
+  };
+  if (pageMap[currentHash]) pageTitle = pageMap[currentHash];
+  var html = '<div class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">';
+  html += '<div class="flex items-center gap-4">';
+  html += '<h1 class="text-lg font-semibold text-gray-800">' + pageTitle + '</h1>';
+  html += '</div>';
+  html += '<div class="flex items-center gap-4">';
+  html += '<div class="relative"><input type="text" placeholder="全局搜索..." class="border border-gray-300 rounded-md pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-48" /><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">&#x1F50D;</span></div>';
+  html += '<div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-medium">管</div>';
+  html += '</div></div>';
+  return html;
+}
+
+// ==================== 主渲染函数 ====================
+window.render = function() {
+  var currentHash = window.location.hash.replace('#', '') || 'home';
+  var pageName = window.router.getCurrentPage();
+  var pageContent = '';
+  if (window.Pages[pageName]) {
+    pageContent = window.Pages[pageName]();
+  } else {
+    pageContent = '<div class="text-center py-20"><h2 class="text-xl text-gray-500">页面开发中...</h2></div>';
+  }
+
+  var isHome = (currentHash === '' || currentHash === 'home');
+  var html = '';
+
+  if (isHome) {
+    html += '<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">';
+    html += '<div class="max-w-6xl mx-auto px-4 py-8">' + pageContent + '</div>';
+    html += '<footer class="text-center py-6 text-sm text-gray-400">&copy; 2026 模架工装智能管理系统 V2.6.0</footer>';
+    html += '</div>';
+  } else {
+    html += '<div class="flex h-screen overflow-hidden">';
+    html += '<aside class="w-60 bg-sidebar-bg flex-shrink-0 flex flex-col">' + renderMenu() + '</aside>';
+    html += '<div class="flex-1 flex flex-col overflow-hidden">';
+    html += renderTopBar();
+    html += '<main class="flex-1 overflow-y-auto p-6 bg-gray-50">' + pageContent + '</main>';
+    html += '</div></div>';
+  }
+
+  document.getElementById('app').innerHTML = html;
+};
+
+// ==================== 路由监听 ====================
+window.addEventListener('hashchange', function() {
+  window.render();
+});
+
+// ==================== 初始化 ====================
+window.render();
+</script>
 </body>
 </html>
