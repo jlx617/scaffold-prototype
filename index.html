@@ -279,9 +279,9 @@
         ];
         
         return `<div class="min-h-screen bg-slate-50 flex">
-          ${this.sidebar()}
+          ${Pages.sidebar()}
           <div class="flex-1 flex flex-col">
-            ${this.header('仓库设置')}
+            ${Pages.header('仓库设置')}
             <main class="flex-1 p-6 overflow-auto">
               <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.length}</div><p class="text-sm text-slate-500">仓库总数</p>` })}
