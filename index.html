@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模架工装智能管理系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            border: 'hsl(var(--border))',
+            input: 'hsl(var(--input))',
+            ring: 'hsl(var(--ring))',
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            primary: {
+              DEFAULT: 'hsl(var(--primary))',
+              foreground: 'hsl(var(--primary-foreground))',
+            },
+            secondary: {
+              DEFAULT: 'hsl(var(--secondary))',
+              foreground: 'hsl(var(--secondary-foreground))',
+            },
+            muted: {
+              DEFAULT: 'hsl(var(--muted))',
+              foreground: 'hsl(var(--muted-foreground))',
+            },
+            accent: {
+              DEFAULT: 'hsl(var(--accent))',
+              foreground: 'hsl(var(--accent-foreground))',
+            },
+            destructive: {
+              DEFAULT: 'hsl(var(--destructive))',
+              foreground: 'hsl(var(--destructive-foreground))',
+            },
+            card: {
+              DEFAULT: 'hsl(var(--card))',
+              foreground: 'hsl(var(--card-foreground))',
+            },
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    :root {
+      --background: 0 0% 100%;
+      --foreground: 222.2 84% 4.9%;
+      --card: 0 0% 100%;
+      --card-foreground: 222.2 84% 4.9%;
+      --popover: 0 0% 100%;
+      --popover-foreground: 222.2 84% 4.9%;
+      --primary: 221.2 83.2% 53.3%;
+      --primary-foreground: 210 40% 98%;
+      --secondary: 210 40% 96.1%;
+      --secondary-foreground: 222.2 47.4% 11.2%;
+      --muted: 210 40% 96.1%;
+      --muted-foreground: 215.4 16.3% 46.9%;
+      --accent: 210 40% 96.1%;
+      --accent-foreground: 222.2 47.4% 11.2%;
+      --destructive: 0 84.2% 60.2%;
+      --destructive-foreground: 210 40% 98%;
+      --border: 214.3 31.8% 91.4%;
+      --input: 214.3 31.8% 91.4%;
+      --ring: 221.2 83.2% 53.3%;
+      --radius: 0.5rem;
+    }
+    * {
+      border-color: hsl(var(--border));
+    }
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 50;
+    }
+    .dialog-content {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      z-index: 51;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  <div id="app"></div>
+  <script>
+    // 状态管理
+    const store = {
+      systemConfig: JSON.parse(localStorage.getItem('systemConfig') || '{}'),
+      globalRules: JSON.parse(localStorage.getItem('globalRules') || '{}'),
+      versions: JSON.parse(localStorage.getItem('versions') || '[{"name":"v1.0.0","description":"初始版本","current":true}]'),
+      menus: JSON.parse(localStorage.getItem('menus') || '[]'),
+      
+      save(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+        this[key] = value;
+      }
+    };
+
+    // 初始化默认数据
+    if (!store.systemConfig.name) {
+      store.save('systemConfig', {
+        name: '模架工装智能管理系统',
+        theme: 'light',
+        layout: 'sidebar',
+        enableNotification: true,
+        enableAuditLog: true,
+        sessionTimeout: 30
+      });
+    }
+
+    // 路由管理
+    const router = {
+      current: window.location.hash.slice(1) || 'home',
+      navigate(path) {
+        window.location.hash = path;
+        this.current = path;
+        render();
+      }
+    };
+
+    // 组件
+    const Components = {
+      Button({ children, onClick, variant = 'primary', className = '' }) {
+        const variants = {
+          primary: 'bg-blue-600 text-white hover:bg-blue-700',
+          secondary: 'bg-slate-200 text-slate-900 hover:bg-slate-300',
+          outline: 'border border-slate-300 bg-white hover:bg-slate-50',
+          ghost: 'hover:bg-slate-100'
+        };
+        return `<button onclick="${onClick}" class="px-4 py-2 rounded-lg font-medium transition-colors ${variants[variant]} ${className}">${children}</button>`;
+      },
+      
+      Card({ title, children, className = '' }) {
+        return `<div class="bg-white rounded-xl border border-slate-200 shadow-sm ${className}">
+          ${title ? `<div class="px-6 py-4 border-b border-slate-100"><h3 class="font-semibold text-lg">${title}</h3></div>` : ''}
+          <div class="p-6">${children}</div>
+        </div>`;
+      },
+
+      Input({ label, value = '', onChange, placeholder = '', type = 'text' }) {
+        return `<div class="space-y-2">
+          ${label ? `<label class="text-sm font-medium">${label}</label>` : ''}
+          <input type="${type}" value="${value}" onchange="${onChange}" placeholder="${placeholder}" 
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>`;
+      },
+
+      Select({ label, value, options, onChange }) {
+        const opts = options.map(o => `<option value="${o.value}" ${o.value === value ? 'selected' : ''}>${o.label}</option>`).join('');
+        return `<div class="space-y-2">
+          ${label ? `<label class="text-sm font-medium">${label}</label>` : ''}
+          <select onchange="${onChange}" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            ${opts}
+          </select>
+        </div>`;
+      },
+
+      Switch({ label, checked, onChange }) {
+        return `<div class="flex items-center justify-between">
+          <span class="text-sm font-medium">${label}</span>
+          <button onclick="${onChange}" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-200'}">
+            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}"></span>
+          </button>
+        </div>`;
+      },
+
+      Badge({ children, variant = 'default' }) {
+        const variants = {
+          default: 'bg-slate-100 text-slate-800',
+          success: 'bg-green-100 text-green-800',
+          warning: 'bg-yellow-100 text-yellow-800',
+          danger: 'bg-red-100 text-red-800'
+        };
+        return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[variant]}">${children}</span>`;
+      },
+
+      Table({ headers, rows }) {
+        const headerCells = headers.map(h => `<th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">${h}</th>`).join('');
+        const bodyRows = rows.map(row => `<tr class="border-b border-slate-100 hover:bg-slate-50">${row.map(cell => `<td class="px-4 py-3 text-sm">${cell}</td>`).join('')}</tr>`).join('');
+        return `<div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-50"><tr>${headerCells}</tr></thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </div>`;
+      },
+
+      Dialog({ id, title, children, onClose }) {
+        return `<div id="${id}" class="dialog-overlay" onclick="if(event.target===this){${onClose}}" hidden>
+          <div class="dialog-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold">${title}</h2>
+              <button onclick="${onClose}" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            ${children}
+          </div>
+        </div>`;
+      }
+    };
+
+    // 页面组件
+    const Pages = {
+      home() {
+        return `<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+          <header class="bg-white border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                </div>
+                <div>
+                  <h1 class="text-xl font-bold text-slate-900">模架工装智能管理系统</h1>
+                  <p class="text-xs text-slate-500">高保真原型平台</p>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="text-center mb-16">
+              <h2 class="text-4xl font-bold text-slate-900 mb-4">模架工装智能管理系统</h2>
+              <p class="text-lg text-slate-600 max-w-2xl mx-auto mb-8">
+                基于需求调研资料构建的高保真原型平台，支持版本管理、页面配置、菜单调整等功能
+              </p>
+              <div class="flex justify-center gap-4">
+                ${Components.Button({ children: '进入原型', onClick: 'router.navigate("warehouse")', className: 'px-8' })}
+                ${Components.Button({ children: '配置中心', onClick: 'router.navigate("config")', variant: 'outline', className: 'px-8' })}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
+              ${[{l:'一级模块',v:7},{l:'页面数量',v:22},{l:'功能点',v:50},{l:'配置项',v:200}].map(s => 
+                Components.Card({ children: `<div class="text-center"><div class="text-3xl font-bold text-slate-900 mb-1">${s.v}</div><div class="text-sm text-slate-500">${s.l}</div></div>` })
+              ).join('')}
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              ${['基础设置','资产仓库','订单管理','设计管理','资产管理','结算管理','统计分析','系统配置'].map((m,i) => 
+                `<div class="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer" onclick="router.navigate('${['warehouse','map','rental-order','archive','outbound','internal-settlement','inventory-analysis','config'][i]}')">
+                  <div class="inline-block px-3 py-1 rounded-full text-xs font-medium mb-2 bg-blue-100 text-blue-700">${m}</div>
+                  <p class="text-sm text-slate-600">点击查看</p>
+                </div>`
+              ).join('')}
+            </div>
+          </main>
+        </div>`;
+      },
+
+      warehouse() {
+        const warehouses = [
+          {code:'WH-001',name:'华东中心仓库',type:'中心仓库',company:'华东分公司',manager:'张伟',phone:'13800138001',status:'启用'},
+          {code:'WH-002',name:'华南中心仓库',type:'中心仓库',company:'华南分公司',manager:'李娜',phone:'13800138002',status:'启用'},
+          {code:'WH-003',name:'华北中心仓库',type:'中心仓库',company:'华北分公司',manager:'王强',phone:'13800138003',status:'启用'},
+          {code:'PJ-001',name:'上海浦东项目仓库',type:'项目仓库',company:'华东分公司',manager:'刘洋',phone:'13800138004',status:'启用'},
+          {code:'PJ-002',name:'深圳南山项目仓库',type:'项目仓库',company:'华南分公司',manager:'陈明',phone:'13800138005',status:'启用'},
+          {code:'PJ-003',name:'北京朝阳项目仓库',type:'项目仓库',company:'华北分公司',manager:'赵磊',phone:'13800138006',status:'停用'},
+          {code:'ST-001',name:'杭州物料站',type:'物料站',company:'华东分公司',manager:'孙涛',phone:'13800138007',status:'启用'},
+          {code:'ST-002',name:'武汉物料站',type:'物料站',company:'华南分公司',manager:'周杰',phone:'13800138008',status:'启用'},
+        ];
+        
+        return `<div class="min-h-screen bg-slate-50 flex">
+          ${this.sidebar()}
+          <div class="flex-1 flex flex-col">
+            ${this.header('仓库设置')}
+            <main class="flex-1 p-6 overflow-auto">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.length}</div><p class="text-sm text-slate-500">仓库总数</p>` })}
+                ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.filter(w=>w.type==='中心仓库').length}</div><p class="text-sm text-slate-500">中心仓库</p>` })}
+                ${Components.Card({ children: `<div class="text-2xl font-bold">${warehouses.filter(w=>w.type==='项目仓库').length}</div><p class="text-sm text-slate-500">项目仓库</p>` })}
+                ${Components.Card({ children: `<div class="text-2xl font-bold text-green-600">${warehouses.filter(w=>w.status==='启用').length}</div><p class="text-sm text-slate-500">启用中</p>` })}
+              </div>
+              
+              ${Components.Card({ title: '仓库列表', children: `
+                <div class="flex items-center gap-4 mb-4">
+                  <input type="text" placeholder="搜索仓库编码或名称..." class="flex-1 max-w-sm px-3 py-2 border border-slate-300 rounded-lg">
+                  <select class="px-3 py-2 border border-slate-300 rounded-lg"><option>全部类型</option><option>中心仓库</option><option>项目仓库</option><option>物料站</option></select>
+                  <select class="px-3 py-2 border border-slate-300 rounded-lg"><option>全部状态</option><option>启用</option><option>停用</option></select>
+                  ${Components.Button({ children: '新增仓库', onClick: 'showDialog("add-warehouse")' })}
+                  ${Components.Button({ children: '导出', variant: 'outline' })}
+                </div>
+                ${Components.Table({
+                  headers: ['编码','名称','类型','所属分公司','负责人','联系电话','状态','操作'],
+                  rows: warehouses.map(w => [
+                    w.code, w.name, w.type, w.company, w.manager, w.phone,
+                    Components.Badge({ children: w.status, variant: w.status === '启用' ? 'success' : 'default' }),
+                    `<div class="flex gap-2"><button class="text-blue-600 hover:text-blue-800">查看</button><button class="text-blue-600 hover:text-blue-800">编辑</button><button class="text-red-600 hover:text-red-800">删除</button></div>`
+                  ])
+                })}
+              ` })}
+            </main>
+          </div>
+          ${Components.Dialog({ id: 'add-warehouse', title: '新增仓库', onClose: 'hideDialog("add-warehouse")', children: `
+            <div class="space-y-4">
+              ${Components.Input({ label: '仓库编码', placeholder: '例如: CK001' })}
+              ${Components.Input({ label: '仓库名称', placeholder: '例如: 武汉物料站' })}
+              ${Components.Select({ label: '仓库类型', options: [{value:'',label:'请选择'},{value:'center',label:'中心仓库'},{value:'project',label:'项目仓库'},{value:'station',label:'物料站'}] })}
+              ${Components.Select({ label: '所属分公司', options: [{value:'',label:'请选择'},{value:'east',label:'华东分公司'},{value:'south',label:'华南分公司'},{value:'north',label:'华北分公司'}] })}
+              ${Components.Input({ label: '负责人', placeholder: '负责人姓名' })}
+              ${Components.Input({ label: '联系电话', placeholder: '联系电话' })}
+              ${Components.Input({ label: '地址', placeholder: '仓库地址' })}
+              <div class="flex justify-end gap-2 pt-4">
+                ${Components.Button({ children: '取消', variant: 'outline', onClick: 'hideDialog("add-warehouse")' })}
+                ${Components.Button({ children: '确认新增', onClick: 'hideDialog("add-warehouse")' })}
+              </div>
+            </div>
+          ` })}
+        </div>`;
+      },
+
+      config() {
+        return `<div class="min-h-screen bg-slate-50 flex">
+          <aside class="w-64 bg-white border-r border-slate-200">
+            <div class="h-16 flex items-center px-4 border-b border-slate-200">
+              <span class="font-semibold text-slate-900">配置中心</span>
+            </div>
+            <nav class="p-4 space-y-1">
+              ${['配置概览','版本管理','菜单配置','页面配置','角色权限','系统设置'].map((item, i) => 
+                `<a href="#config/${['overview','versions','menus','pages','roles','system'][i]}" class="flex items-center gap-3 px-3 py-2 rounded-lg ${router.current === 'config/' + ['overview','versions','menus','pages','roles','system'][i] ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}">
+                  <span>${item}</span>
+                </a>`
+              ).join('')}
+            </nav>
+          </aside>
+          <div class="flex-1 flex flex-col">
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
+              <h1 class="text-lg font-semibold">配置概览</h1>
+              <div class="flex gap-2">
+                ${Components.Button({ children: '导出配置', variant: 'outline' })}
+                ${Components.Button({ children: '导入配置', variant: 'outline' })}
+                ${Components.Button({ children: '保存更改' })}
+              </div>
+            </header>
+            <main class="flex-1 p-6 overflow-auto">
+              ${Components.Card({ title: '当前版本', children: `
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="text-2xl font-bold">v1.0.0</div>
+                    <p class="text-slate-500">系统初始版本</p>
+                  </div>
+                  ${Components.Badge({ children: '当前版本', variant: 'success' })}
+                </div>
+              ` })}
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                ${Components.Card({ children: `<div class="text-2xl font-bold">7</div><p class="text-sm text-slate-500">一级模块</p>` })}
+                ${Components.Card({ children: `<div class="text-2xl font-bold">22</div><p class="text-sm text-slate-500">页面数量</p>` })}
+                ${Components.Card({ children: `<div class="text-2xl font-bold">5</div><p class="text-sm text-slate-500">角色数量</p>` })}
+                ${Components.Card({ children: `<div class="text-2xl font-bold">1</div><p class="text-sm text-slate-500">版本数量</p>` })}
+              </div>
+            </main>
+          </div>
+        </div>`;
+      },
+
+      'config/system'() {
+        const config = store.systemConfig;
+        return `<div class="min-h-screen bg-slate-50 flex">
+          <aside class="w-64 bg-white border-r border-slate-200">
+            <div class="h-16 flex items-center px-4 border-b border-slate-200">
+              <span class="font-semibold text-slate-900">配置中心</span>
+            </div>
+            <nav class="p-4 space-y-1">
+              ${['配置概览','版本管理','菜单配置','页面配置','角色权限','系统设置'].map((item, i) => 
+                `<a href="#config/${['overview','versions','menus','pages','roles','system'][i]}" class="flex items-center gap-3 px-3 py-2 rounded-lg ${router.current === 'config/' + ['overview','versions','menus','pages','roles','system'][i] ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}">
+                  <span>${item}</span>
+                </a>`
+              ).join('')}
+            </nav>
+          </aside>
+          <div class="flex-1 flex flex-col">
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
+              <h1 class="text-lg font-semibold">系统设置</h1>
+              <div class="flex gap-2">
+                ${Components.Button({ children: '导出配置', variant: 'outline' })}
+                ${Components.Button({ children: '导入配置', variant: 'outline' })}
+                ${Components.Button({ children: '保存更改', onClick: 'saveSystemConfig()' })}
+              </div>
+            </header>
+            <main class="flex-1 p-6 overflow-auto">
+              <div class="max-w-2xl space-y-6">
+                ${Components.Card({ title: '基本信息', children: `
+                  ${Components.Input({ label: '系统名称', value: config.name, onChange: 'updateConfig("name", this.value)' })}
+                  ${Components.Select({ label: '主题', value: config.theme, options: [{value:'light',label:'浅色主题'},{value:'dark',label:'深色主题'}], onChange: 'updateConfig("theme", this.value)' })}
+                  ${Components.Select({ label: '布局', value: config.layout, options: [{value:'sidebar',label:'侧边栏布局'},{value:'topbar',label:'顶部导航'}], onChange: 'updateConfig("layout", this.value)' })}
+                ` })}
+                ${Components.Card({ title: '功能开关', children: `
+                  ${Components.Switch({ label: '启用通知', checked: config.enableNotification, onChange: 'toggleConfig("enableNotification")' })}
+                  ${Components.Switch({ label: '启用审计日志', checked: config.enableAuditLog, onChange: 'toggleConfig("enableAuditLog")' })}
+                ` })}
+              </div>
+            </main>
+          </div>
+        </div>`;
+      },
+
+      sidebar() {
+        const menus = [
+          { label: '基础设置', children: [{l:'仓库设置',p:'warehouse'},{l:'产品分类',p:'product-category'},{l:'产品管理',p:'product-management'},{l:'BOM清单',p:'bom'},{l:'摊销规则',p:'amortization'},{l:'租赁规则',p:'rental'}] },
+          { label: '资产仓库', children: [{l:'资产地图',p:'map'},{l:'仓库管理',p:'management'}] },
+          { label: '订单管理', children: [{l:'租赁订单',p:'rental-order'},{l:'调拨订单',p:'transfer-order'},{l:'采购订单',p:'purchase-order'}] },
+          { label: '设计管理', children: [{l:'设计档案库',p:'archive'}] },
+          { label: '资产管理', children: [{l:'出库管理',p:'outbound'},{l:'入库管理',p:'inbound'},{l:'盘点管理',p:'inventory-check'},{l:'维保管理',p:'maintenance'},{l:'废旧处置',p:'disposal'},{l:'翻新管理',p:'refurbishment'}] },
+          { label: '结算管理', children: [{l:'内部结算',p:'internal-settlement'},{l:'外部结算',p:'external-settlement'}] },
+          { label: '统计分析', children: [{l:'库存分析',p:'inventory-analysis'},{l:'其他分析',p:'other-analysis'}] },
+        ];
+        return `<aside class="w-64 bg-white border-r border-slate-200 flex-shrink-0">
+          <div class="h-16 flex items-center px-4 border-b border-slate-200">
+            <span class="font-semibold text-slate-900">模架工装系统</span>
+          </div>
+          <nav class="p-2 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
+            ${menus.map(m => `
+              <div class="space-y-1">
+                <div class="px-3 py-2 text-sm font-medium text-slate-900">${m.label}</div>
+                ${m.children.map(c => `
+                  <a href="#${c.p}" class="block px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg ${router.current === c.p ? 'bg-blue-50 text-blue-600' : ''}">${c.l}</a>
+                `).join('')}
+              </div>
+            `).join('')}
+          </nav>
+        </aside>`;
+      },
+
+      header(title) {
+        return `<header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
+          <div class="flex items-center gap-4">
+            <h1 class="text-lg font-semibold">${title}</h1>
+            <span class="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">v1.0.0</span>
+          </div>
+          <div class="flex items-center gap-2">
+            ${Components.Button({ children: '编辑模式', variant: 'outline' })}
+            ${Components.Button({ children: '配置', variant: 'outline', onClick: 'router.navigate("config")' })}
+          </div>
+        </header>`;
+      }
+    };
+
+    // 全局函数
+    window.router = router;
+    window.showDialog = (id) => document.getElementById(id).hidden = false;
+    window.hideDialog = (id) => document.getElementById(id).hidden = true;
+    window.updateConfig = (key, value) => {
+      store.systemConfig[key] = value;
+      store.save('systemConfig', store.systemConfig);
+    };
+    window.toggleConfig = (key) => {
+      store.systemConfig[key] = !store.systemConfig[key];
+      store.save('systemConfig', store.systemConfig);
+      render();
+    };
+    window.saveSystemConfig = () => {
+      alert('配置已保存！');
+    };
+
+    // 渲染函数
+    function render() {
+      const page = router.current;
+      const pageFn = Pages[page] || Pages['config/system'];
+      document.getElementById('app').innerHTML = pageFn();
+    }
+
+    // 初始化
+    window.addEventListener('hashchange', () => {
+      router.current = window.location.hash.slice(1) || 'home';
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>
