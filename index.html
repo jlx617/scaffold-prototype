@@ -142,7 +142,7 @@
           outline: 'border border-slate-300 bg-white hover:bg-slate-50',
           ghost: 'hover:bg-slate-100'
         };
-        return `<button onclick="${onClick}" class="px-4 py-2 rounded-lg font-medium transition-colors ${variants[variant]} ${className}">${children}</button>`;
+        return `<button onclick='${onClick}' class="px-4 py-2 rounded-lg font-medium transition-colors ${variants[variant]} ${className}">${children}</button>`;
       },
       
       Card({ title, children, className = '' }) {
