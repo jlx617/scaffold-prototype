@@ -452,6 +452,8 @@
 
     // 全局函数
     window.router = router;
+    window.Pages = Pages;
+    window.render = render;
     window.showDialog = (id) => document.getElementById(id).hidden = false;
     window.hideDialog = (id) => document.getElementById(id).hidden = true;
     window.updateConfig = (key, value) => {
@@ -469,17 +471,17 @@
 
     // 渲染函数
     function render() {
-      const page = router.current;
-      const pageFn = Pages[page] || Pages['config/system'];
+      const page = window.router.current;
+      const pageFn = window.Pages[page] || window.Pages['config/system'];
       document.getElementById('app').innerHTML = pageFn();
     }
 
     // 初始化
     window.addEventListener('hashchange', () => {
-      router.current = window.location.hash.slice(1) || 'home';
-      render();
+      window.router.current = window.location.hash.slice(1) || 'home';
+      window.render();
     });
-    render();
+    window.render();
   </script>
 </body>
 </html>
